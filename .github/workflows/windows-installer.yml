@@ -47,7 +47,7 @@ jobs:
           }
           & .\tools\package-security-gate.ps1 -PackageRoot $stage -OutputManifest 'package-manifest.json'
           Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.6.zip' -CompressionLevel Optimal
-          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.5.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.6.sha256'
+          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.6.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.6.sha256'
       - uses: actions/upload-artifact@v4
         with:
           name: ComfyUI-Diagnostics-Windows-LAB
