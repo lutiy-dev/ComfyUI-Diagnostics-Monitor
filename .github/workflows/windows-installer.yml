@@ -35,7 +35,7 @@ jobs:
       - name: Build ZIP package
         shell: powershell
         run: |
-          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
+          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
           $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
           New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib'),(Join-Path $stage 'docs') | Out-Null
           foreach($f in $files) {
