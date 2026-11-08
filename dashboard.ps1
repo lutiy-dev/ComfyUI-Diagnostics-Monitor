@@ -138,6 +138,12 @@ function Tick-WebSocket {
 }
 
 $form=New-Object Windows.Forms.Form
+$script:appIcon=$null
+$iconPath=Join-Path $PSScriptRoot 'app.ico'
+if(Test-Path -LiteralPath $iconPath -PathType Leaf){
+    $script:appIcon=[Drawing.Icon]::new($iconPath)
+    $form.Icon=$script:appIcon
+}
 $form.Text="ComfyUI Diagnostics · $Machine · LAB v0.4"
 $form.Size=[Drawing.Size]::new(960,740)
 $form.MinimumSize=[Drawing.Size]::new(960,740)
@@ -339,7 +345,7 @@ $timer.Add_Tick({
 # Keep the WinForms message loop alive when the main window is hidden for HUD.
 # ShowDialog() exits on Hide(), causing the PowerShell process to terminate.
 $script:tray=New-Object System.Windows.Forms.NotifyIcon
-$script:tray.Icon=[Drawing.SystemIcons]::Application
+$script:tray.Icon=if($null -ne $script:appIcon){$script:appIcon}else{[Drawing.SystemIcons]::Application}
 $script:tray.Text='ComfyUI Diagnostics HOME/WORK - restore'
 $script:tray.Visible=$true
 $trayMenu=New-Object System.Windows.Forms.ContextMenuStrip
@@ -359,6 +365,7 @@ $form.Add_FormClosing({
     $script:hud.Close()
     $script:hud.Dispose()
     $script:message.Dispose()
+    if($null -ne $script:appIcon){$script:appIcon.Dispose()}
 })
 if ($SelfTest) {
     if (-not $form.TopMost -or -not $script:hud.TopMost -or $script:hud.TransparencyKey -ne [Drawing.Color]::Magenta) { throw 'HUD configuration FAILED' }
@@ -369,6 +376,7 @@ if ($SelfTest) {
     $script:hud.Dispose()
     $form.Dispose()
     $script:message.Dispose()
+    if($null -ne $script:appIcon){$script:appIcon.Dispose()}
     Write-Host 'PASS: WinForms Dashboard controls created'
     return
 }
