@@ -31,8 +31,12 @@ function Initialize-Hud {
             $detail="VRAM: no data"
             if ($null -ne $script:gpu -and $script:gpu.Text -match 'Load:') { $label=$script:gpu.Text }
             if ($null -ne $script:vram) { $detail=$script:vram.Text }
-            $g.DrawString($label,$font,$white,8,3)
-            $g.DrawString($detail,$small,$white,8,28)
+            $cyanBrush=New-Object Drawing.SolidBrush([Drawing.Color]::DeepSkyBlue)
+            $orangeBrush=New-Object Drawing.SolidBrush([Drawing.Color]::Orange)
+            try {
+                $g.DrawString($label,$font,$cyanBrush,8,3)
+                $g.DrawString($detail,$small,$orangeBrush,8,28)
+            } finally { $cyanBrush.Dispose(); $orangeBrush.Dispose() }
             $g.DrawString("ComfyUI: "+$script:session+" | "+$script:wsState,$small,$white,8,47)
             $stepText=if ($script:stepTotal -gt 0) { "Step $($script:step)/$($script:stepTotal)" } else { "Node: $($script:activeNode)" }
             $g.DrawString($stepText,$small,$white,8,66)
