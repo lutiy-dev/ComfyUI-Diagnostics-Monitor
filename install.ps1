@@ -17,7 +17,7 @@ if ($InstallRoot -eq [IO.Path]::GetPathRoot($InstallRoot) -or $DataRoot -eq [IO.
     throw 'A filesystem root is not an acceptable destination'
 }
 if ($InstallRoot -eq $source) { throw 'InstallRoot must differ from source' }
-$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','evidence.ps1','configurator.ps1')
+$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py')
 foreach($file in $payload) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $file) -PathType Leaf)) { throw "Missing payload file: $file" }
 }
