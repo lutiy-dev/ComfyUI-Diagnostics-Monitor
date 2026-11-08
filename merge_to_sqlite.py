@@ -21,11 +21,17 @@ def merge(db, inputs):
         for pattern in inputs:
             for path in glob.glob(pattern):
                 p = Path(path)
-                if not p.is_file() or p.suffix.lower() != ".jsonl":
+                if not p.is_file() or p.suffix.lower() not in {".jsonl", ".json"}:
                     continue
-                kind = "event" if p.name.startswith("events_") else "telemetry"
+                if p.suffix.lower() == ".json" and not p.name.startswith("evidence_"):
+                    continue
+                kind = ("evidence" if p.suffix.lower() == ".json"
+                        else "event" if p.name.startswith("events_")
+                        else "live" if p.name.startswith("live_")
+                        else "telemetry")
                 with p.open(encoding="utf-8-sig", errors="replace") as source:
-                    for line in source:
+                    lines = [source.read()] if kind == "evidence" else source
+                    for line in lines:
                         if not line.strip():
                             continue
                         try:
@@ -34,7 +40,7 @@ def merge(db, inputs):
                                 raise ValueError("missing machine")
                             canonical = json.dumps(item, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
                             digest = hashlib.sha256((kind + "\0" + canonical).encode()).hexdigest()
-                            when = item.get("timestamp_utc") or item.get("event_utc")
+                            when = item.get("timestamp_utc") or item.get("event_utc") or item.get("created_utc")
                             cursor = conn.execute(
                                 "INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?)",
                                 (digest, str(item["machine"]), when, kind, p.name, canonical))
