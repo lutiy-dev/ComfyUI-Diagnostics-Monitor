@@ -10,6 +10,7 @@ param(
  [switch]$SkipProcesses,
  [switch]$SkipStorage,
  [switch]$SkipComfy,
+ [switch]$ArchiveComfyLog,
  [switch]$SelfTest
 )
 $ErrorActionPreference='Stop'
@@ -147,6 +148,34 @@ if (-not $SkipComfy) {
 } else {
  $report.sources.comfy_queue=@{status='DISABLED'}
  $report.sources.comfy_log_evidence=@{status='DISABLED'}
+}
+# Optional full private log archive. This file may contain prompts, paths and tokens.
+# Never enabled by default; no automatic upload or export outside DataRoot.
+if($ArchiveComfyLog -and -not $SkipComfy) {
+ $report.sources.private_comfy_log=@{status='UNAVAILABLE';reason='LOG_MISSING_OR_EXCEEDS_QUOTA'}
+ if($ComfyLog -and (Test-Path -LiteralPath $ComfyLog -PathType Leaf)) {
+  $rawFile=Get-Item -LiteralPath $ComfyLog
+  $private=Join-Path $DataRoot 'private'
+  $null=New-Item -ItemType Directory -Path $private -Force
+  $existingPrivate=@(Get-ChildItem -LiteralPath $private -File -Filter '*.log' -ErrorAction SilentlyContinue)
+  $privateSum=(@($existingPrivate|Measure-Object Length -Sum)[0].Sum)
+  if($rawFile.Length -le 20MB -and $existingPrivate.Count -lt 20 -and $privateSum -lt 200MB){
+   $filename='comfy_private_'+$Machine+'_'+(Get-Date -Format 'yyyyMMdd_HHmmss')+'_'+[guid]::NewGuid().ToString('N').Substring(0,8)+'.log'
+   $destination=Join-Path $private $filename
+   try {
+    [IO.File]::Copy($ComfyLog,$destination,$false)
+    $report.sources.private_comfy_log=@{
+      status='OK';file_name=$filename;subfolder='private'
+      size_bytes=(Get-Item -LiteralPath $destination).Length
+      sha256=(Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
+      privacy='RAW_CONTAINS_POTENTIAL_SECRETS; LOCAL_ONLY; USER_CONSENT_REQUIRED_BEFORE_SHARING'
+    }
+   } catch {
+    if(Test-Path -LiteralPath $destination){Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue}
+    $report.sources.private_comfy_log=@{status='UNAVAILABLE';reason='LOG_COPY_FAILED'}
+   }
+  }
+ }
 }
 $report.coverage=[ordered]@{available=@();missing=@();disabled=@()}
 foreach($key in @($report.sources.Keys)) {
