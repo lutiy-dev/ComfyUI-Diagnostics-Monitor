@@ -1,4 +1,5 @@
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import sys
@@ -21,7 +22,7 @@ class ImportTests(unittest.TestCase):
             db = root / "test.sqlite"
             self.assertEqual(merge(db, [str(archive)]), (2, 0, 1, 2))
             self.assertEqual(merge(db, [str(archive)]), (0, 2, 1, 2))
-            with sqlite3.connect(db) as con:
+            with closing(sqlite3.connect(db)) as con:
                 self.assertEqual(con.execute("SELECT COUNT(DISTINCT machine) FROM records").fetchone()[0], 2)
 
     def test_invalid_payload_not_imported(self):
