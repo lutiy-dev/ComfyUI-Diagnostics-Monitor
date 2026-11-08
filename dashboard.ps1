@@ -144,6 +144,8 @@ $form.BackColor=[Drawing.Color]::FromArgb(22,26,33)
 $form.ForeColor=[Drawing.Color]::White
 $form.Font=[Drawing.Font]::new('Segoe UI',10)
 $form.StartPosition='CenterScreen'
+$form.TopMost=$true
+$form.KeyPreview=$true
 
 function New-Label([string]$name,[int]$x,[int]$y,[int]$width,[int]$height,[int]$size=11) {
     $l=New-Object Windows.Forms.Label
@@ -202,6 +204,23 @@ $incident.ForeColor=[Drawing.Color]::White
 $incident.Font=[Drawing.Font]::new('Consolas',9)
 $form.Controls.Add($incident)
 
+. (Join-Path $PSScriptRoot 'lib\Hud.ps1')
+Initialize-Hud
+$hudButton=New-Object System.Windows.Forms.Button
+$hudButton.Text='HUD (F9)'
+$hudButton.Location=[Drawing.Point]::new(784,12)
+$hudButton.Size=[Drawing.Size]::new(136,34)
+$hudButton.FlatStyle=[System.Windows.Forms.FlatStyle]::Flat
+$hudButton.ForeColor=[Drawing.Color]::White
+$hudButton.BackColor=[Drawing.Color]::FromArgb(42,55,68)
+$form.Controls.Add($hudButton)
+$hudButton.Add_Click({Switch-ToHud})
+$form.Add_KeyDown({param($sender,$e);if ($e.KeyCode -eq [Windows.Forms.Keys]::F9) { Switch-ToHud }})
+$form.Add_Resize({
+    if (-not $script:closing -and -not $script:hudVisible -and $script:form.WindowState -eq [Windows.Forms.FormWindowState]::Minimized) {
+        Switch-ToHud
+    }
+})
 function To-Metric([object]$value) {
     $number=0.0
     if ($null -eq $value) { return $null }
@@ -273,11 +292,14 @@ $timer.Add_Tick({
         Tick-WebSocket
         $script:ticks++
         if ($script:ticks % 3 -eq 0) { Update-Telemetry; Update-Incidents }
+        if ($script:hudVisible) { $script:hud.Invalidate() }
     } catch { $status.Text='Monitor UI warning (see PowerShell console)' }
 })
-$form.Add_FormClosing({ $script:closing=$true; $timer.Stop(); Safe-Disconnect; $script:message.Dispose() })
+$form.Add_FormClosing({ $script:closing=$true; $timer.Stop(); Safe-Disconnect; $script:hud.Close(); $script:hud.Dispose(); $script:message.Dispose() })
 if ($SelfTest) {
+    if (-not $form.TopMost -or -not $script:hud.TopMost -or $script:hud.TransparencyKey -ne [Drawing.Color]::Magenta) { throw 'HUD configuration FAILED' }
     $timer.Dispose()
+    $script:hud.Dispose()
     $form.Dispose()
     $script:message.Dispose()
     Write-Host 'PASS: WinForms Dashboard controls created'
