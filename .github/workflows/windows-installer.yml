@@ -33,6 +33,7 @@ jobs:
           & (Join-Path $inst 'launch.ps1') -Mode Dashboard -SelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Collector -SelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Configurator -SelfTest
+          & (Join-Path $inst 'configurator.ps1') -Machine HOME -DataRoot $data -ComfyLog '' -SelfTest -CaptureSelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Evidence -SelfTest
           if (-not (Test-Path (Join-Path $data 'evidence'))) { throw 'Evidence folder not created' }
           # User-opt-in raw log case: private raw file retained, normalized evidence must omit raw secret.
