@@ -1,0 +1,53 @@
+name: Windows LAB installer and portable package
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-and-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell syntax validation
+        shell: powershell
+        run: |
+          foreach ($path in @('install.ps1','uninstall.ps1','dashboard.ps1','collector.ps1','lib/Hud.ps1','lib/ComfyWs.ps1')) {
+            $tokens=$null; $errors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
+            if ($errors.Count -ne 0) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+            Write-Host "PASS parse $path"
+          }
+      - name: Non-admin install, dashboard initialization, removal and data preservation
+        shell: powershell
+        run: |
+          $inst=Join-Path $env:RUNNER_TEMP 'MyApp'
+          $data=Join-Path $env:RUNNER_TEMP 'Diagnostics'
+          & .\install.ps1 -Machine HOME -InstallRoot $inst -DataRoot $data -NoShortcuts
+          if (-not (Test-Path (Join-Path $inst 'installation.json'))) { throw 'Missing install manifest' }
+          'KEEP_MY_DATA' | Set-Content -LiteralPath (Join-Path $data 'preserve.test')
+          & (Join-Path $inst 'launch.ps1') -Mode Dashboard -SelfTest
+          & (Join-Path $inst 'launch.ps1') -Mode Collector -SelfTest
+          & .\uninstall.ps1 -InstallRoot $inst -NoShortcuts
+          if (-not (Test-Path (Join-Path $data 'preserve.test'))) { throw 'Uninstall deleted diagnostic data!' }
+          if (Test-Path (Join-Path $inst 'installation.json')) { throw 'Installation manifest remains after uninstall' }
+          Write-Host 'PASS: installer, WinForms, uninstaller and retained data'
+      - name: Build ZIP package
+        shell: powershell
+        run: |
+          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
+          $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib'),(Join-Path $stage 'docs') | Out-Null
+          foreach($f in $files) {
+            if (-not (Test-Path -LiteralPath $f)) { throw "Missing package input: $f" }
+            Copy-Item -LiteralPath $f -Destination (Join-Path $stage $f)
+          }
+          Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.5.zip' -CompressionLevel Optimal
+          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.5.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.5.sha256'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ComfyUI-Diagnostics-Windows-LAB
+          path: |
+            ComfyUI-Diagnostics-LAB-v0.5.zip
+            ComfyUI-Diagnostics-LAB-v0.5.sha256
+          if-no-files-found: error
