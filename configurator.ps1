@@ -1,0 +1,100 @@
+# ComfyUI Diagnostics Configurator LAB v0.6 — on-demand safe local evidence capture.
+# No privilege elevation, no auto-send, no driver/ComfyUI mutation.
+[CmdletBinding()]
+param(
+ [ValidateSet('HOME','WORK')][string]$Machine='HOME',
+ [string]$DataRoot=(Join-Path $env:LOCALAPPDATA 'ComfyUI-Diagnostics'),
+ [string]$ComfyLog='',
+ [switch]$SelfTest
+)
+$ErrorActionPreference='Stop'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+if($ComfyLog -eq '') {
+ $cfg=Join-Path $PSScriptRoot 'config.json'
+ if(Test-Path -LiteralPath $cfg) {
+  try { $obj=Get-Content -LiteralPath $cfg -Raw|ConvertFrom-Json; $ComfyLog=[string]$obj.comfy_log } catch {}
+ }
+}
+$window=New-Object Windows.Forms.Form
+$window.Text="ComfyUI Diagnostics Configurator · $Machine · LAB v0.6"
+$window.Size=[Drawing.Size]::new(720,590)
+$window.MinimumSize=$window.Size
+$window.MaximumSize=$window.Size
+$window.StartPosition='CenterScreen'
+$window.Font=[Drawing.Font]::new('Segoe UI',10)
+$window.BackColor=[Drawing.Color]::FromArgb(26,31,38)
+$window.ForeColor=[Drawing.Color]::White
+$window.TopMost=$true
+function LabelText([string]$s,[int]$x,[int]$y,[int]$w,[int]$h) {
+ $o=New-Object Windows.Forms.Label
+ $o.Text=$s;$o.Location=[Drawing.Point]::new($x,$y);$o.Size=[Drawing.Size]::new($w,$h)
+ $window.Controls.Add($o);return $o
+}
+$null=LabelText 'Diagnostics Evidence Center' 20 18 620 30
+$null=LabelText 'Read-only capture · Local JSON · No cloud upload or automatic repairs' 20 49 655 24
+$null=LabelText "Machine: $Machine" 20 88 300 25
+$null=LabelText 'History (hours)' 21 123 158 24
+$hours=New-Object Windows.Forms.NumericUpDown
+$hours.Minimum=1;$hours.Maximum=24;$hours.Value=3
+$hours.Location=[Drawing.Point]::new(184,121);$hours.Size=[Drawing.Size]::new(90,27)
+$window.Controls.Add($hours)
+$null=LabelText 'ComfyUI log path (local only, never exported as text)' 21 164 630 22
+$logBox=New-Object Windows.Forms.TextBox
+$logBox.Location=[Drawing.Point]::new(21,191);$logBox.Size=[Drawing.Size]::new(640,28)
+$logBox.Text=$ComfyLog
+$window.Controls.Add($logBox)
+$null=LabelText 'Sources included in snapshot:' 21 235 500 26
+$checks=[ordered]@{}
+$items=@(
+ @('Windows Events / WER','Windows',21,269),
+ @('Python process memory (unverified ComfyUI association)','Processes',21,306),
+ @('Storage capacity','Storage',21,343),
+ @('ComfyUI localhost queue and log signatures','Comfy',21,380)
+)
+foreach($item in $items) {
+ $cb=New-Object Windows.Forms.CheckBox
+ $cb.Text=$item[0];$cb.Checked=$true
+ $cb.Location=[Drawing.Point]::new([int]$item[2],[int]$item[3])
+ $cb.Size=[Drawing.Size]::new(640,28)
+ $window.Controls.Add($cb);$checks[$item[1]]=$cb
+}
+$button=New-Object Windows.Forms.Button
+$button.Text='Capture Evidence'
+$button.Location=[Drawing.Point]::new(21,428)
+$button.Size=[Drawing.Size]::new(208,41)
+$window.Controls.Add($button)
+$open=New-Object Windows.Forms.Button
+$open.Text='Open Evidence Folder'
+$open.Location=[Drawing.Point]::new(245,428)
+$open.Size=[Drawing.Size]::new(214,41)
+$window.Controls.Add($open)
+$status=LabelText 'Ready — all captures are manually triggered.' 21 484 645 45
+$open.Add_Click({
+ $path=Join-Path $DataRoot 'evidence'
+ $null=New-Item -ItemType Directory -Path $path -Force
+ [void][Diagnostics.Process]::Start('explorer.exe','"'+$path+'"')
+})
+$button.Add_Click({
+ $button.Enabled=$false
+ $status.Text='Capturing. This may take several seconds.'
+ $window.Refresh()
+ try {
+  $arguments=@('-Machine',$Machine,'-DataRoot',$DataRoot,'-ComfyLog',$logBox.Text,'-Hours',[int]$hours.Value)
+  foreach($key in @($checks.Keys)){
+   if(-not $checks[$key].Checked){$arguments+=('-Skip'+$key)}
+  }
+  $path=Join-Path $PSScriptRoot 'evidence.ps1'
+  & $path @arguments
+  $status.Text="PASS: Snapshot saved under $DataRoot\evidence"
+ } catch {
+  $status.Text='FAIL: Capture failed. Inspect console error; no automatic retry.'
+ } finally { $button.Enabled=$true }
+})
+if($SelfTest) {
+ if($null -eq $checks.Windows -or -not $button.Enabled -or $hours.Value -ne 3){throw 'FAIL: Configurator controls'}
+ $window.Dispose()
+ Write-Host 'PASS: Configurator controls initialized'
+ return
+}
+[void]$window.ShowDialog()
