@@ -6,10 +6,11 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
+from contextlib import closing
 
 
 def merge(db, inputs):
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn, conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS records (
             digest TEXT PRIMARY KEY, machine TEXT NOT NULL,
             timestamp_utc TEXT, kind TEXT NOT NULL,
