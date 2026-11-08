@@ -160,7 +160,9 @@ function New-Label([string]$name,[int]$x,[int]$y,[int]$width,[int]$height,[int]$
 $title=New-Label 'GPU / ComfyUI Diagnostics' 20 12 620 36 18
 $status=New-Label 'Collector: waiting | WebSocket: connecting' 22 55 900 25 10
 $gpu=New-Label 'GPU: —' 22 94 880 26 13
+$gpu.ForeColor=[Drawing.Color]::DeepSkyBlue
 $vram=New-Label 'VRAM: —' 22 128 880 26 13
+$vram.ForeColor=[Drawing.Color]::Orange
 $temp=New-Label 'Temperature: —  |  Power: —  |  RAM: —' 22 160 900 25 11
 $node=New-Label 'Node: —' 22 200 880 30 13
 $progress=New-Object Windows.Forms.ProgressBar
