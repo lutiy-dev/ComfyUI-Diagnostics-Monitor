@@ -31,6 +31,19 @@ jobs:
           & (Join-Path $inst 'launch.ps1') -Mode Configurator -SelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Evidence -SelfTest
           if (-not (Test-Path (Join-Path $data 'evidence'))) { throw 'Evidence folder not created' }
+          # User-opt-in raw log case: private raw file retained, normalized evidence must omit raw secret.
+          $fake=Join-Path $env:RUNNER_TEMP 'comfyui_synthetic.log'
+          'Python version: 3.12.1' | Set-Content -LiteralPath $fake
+          'CUDA error: SYNTHETIC_PRIVATE_PROMPT_NEVER_EXPORT' | Add-Content -LiteralPath $fake
+          & (Join-Path $inst 'evidence.ps1') -Machine HOME -DataRoot $data -ComfyLog $fake -ArchiveComfyLog -SkipWindows -SkipProcesses -SkipStorage
+          $raw=@(Get-ChildItem (Join-Path $data 'private') -Filter '*.log')
+          if ($raw.Count -ne 1) { throw 'Private raw log not archived under explicit consent' }
+          $records=@(Get-ChildItem (Join-Path $data 'evidence') -Filter '*.json' | Sort-Object LastWriteTime -Descending)
+          $latest=Get-Content -LiteralPath $records[0].FullName -Raw
+          if ($latest -match 'SYNTHETIC_PRIVATE_PROMPT_NEVER_EXPORT') { throw 'Privacy failure: raw log text leaked into normalized evidence' }
+          $parsed=$latest | ConvertFrom-Json
+          if ($parsed.sources.private_comfy_log.status -ne 'OK') { throw 'Raw log archive status not recorded' }
+          Write-Host 'PASS: private opt-in log archive and normalized snapshot redaction'
           & .\uninstall.ps1 -InstallRoot $inst -NoShortcuts
           if (-not (Test-Path (Join-Path $data 'preserve.test'))) { throw 'Uninstall deleted diagnostic data!' }
           if (Test-Path (Join-Path $inst 'installation.json')) { throw 'Installation manifest remains after uninstall' }
