@@ -53,7 +53,10 @@ function Read-Gpu {
 function Read-Comfy {
   try {
     $q=Invoke-RestMethod -Uri ($ComfyUrl.TrimEnd('/')+'/queue') -TimeoutSec 2 -ErrorAction Stop
-    return @{status='ONLINE';running=@($q.queue_running).Count;pending=@($q.queue_pending).Count}
+    $running=0; $pending=0
+    if ($null -ne $q.queue_running) { $running=@($q.queue_running).Count }
+    if ($null -ne $q.queue_pending) { $pending=@($q.queue_pending).Count }
+    return @{status='ONLINE';running=$running;pending=$pending}
   } catch { return @{status='OFFLINE'} }
 }
 function Read-Ram {
