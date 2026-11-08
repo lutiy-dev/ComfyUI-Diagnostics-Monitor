@@ -28,6 +28,9 @@ jobs:
           'KEEP_MY_DATA' | Set-Content -LiteralPath (Join-Path $data 'preserve.test')
           & (Join-Path $inst 'launch.ps1') -Mode Dashboard -SelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Collector -SelfTest
+          & (Join-Path $inst 'launch.ps1') -Mode Configurator -SelfTest
+          & (Join-Path $inst 'launch.ps1') -Mode Evidence -SelfTest
+          if (-not (Test-Path (Join-Path $data 'evidence'))) { throw 'Evidence folder not created' }
           & .\uninstall.ps1 -InstallRoot $inst -NoShortcuts
           if (-not (Test-Path (Join-Path $data 'preserve.test'))) { throw 'Uninstall deleted diagnostic data!' }
           if (Test-Path (Join-Path $inst 'installation.json')) { throw 'Installation manifest remains after uninstall' }
@@ -35,7 +38,7 @@ jobs:
       - name: Build ZIP package
         shell: powershell
         run: |
-          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
+          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','evidence.ps1','configurator.ps1','docs/DIAGNOSTICS_V06.md','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
           $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
           New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib'),(Join-Path $stage 'docs') | Out-Null
           foreach($f in $files) {
@@ -43,8 +46,8 @@ jobs:
             Copy-Item -LiteralPath $f -Destination (Join-Path $stage $f)
           }
           & .\tools\package-security-gate.ps1 -PackageRoot $stage -OutputManifest 'package-manifest.json'
-          Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.5.zip' -CompressionLevel Optimal
-          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.5.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.5.sha256'
+          Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.6.zip' -CompressionLevel Optimal
+          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.5.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.6.sha256'
       - uses: actions/upload-artifact@v4
         with:
           name: ComfyUI-Diagnostics-Windows-LAB
