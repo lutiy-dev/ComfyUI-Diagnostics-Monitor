@@ -3,7 +3,7 @@
 ## What ships
 Existing GPU Collector + Dashboard/HUD remain unchanged. New modules:
 - **Configurator**: manually select local evidence capture (Windows/WER/Reliability, Python process metadata, storage, ComfyUI).
-- **Evidence CLI**: `evidence.ps1`, accepts HOME/WORK, 1–24 hour Windows window, source disable switches, log path.
+- **Evidence CLI**: `evidence.ps1`, accepts HOME/WORK, 1–24 hour Windows window, source disable switches, log path and optional `-ArchiveComfyLog` (off by default).
 - **Private evidence archive**: `%LOCALAPPDATA%\ComfyUI-Diagnostics\evidence\evidence_HOME_<timestamp>_<id>.json`. New writes only, no deletion/overwriting existing v0.3 JSONL.
 - **Tests**: Windows PowerShell parser, Configurator startup, bounded on-demand capture fixture, Windows ZIP install/uninstall/data retention.
 
@@ -48,3 +48,6 @@ LAB user-level ZIP, *not signed EXE/MSI*. SHA-256 and file manifest produced in 
 7. Integrity: unique snapshots, quota, installer retention tests; old JSONL never altered.
 
 **Current status: FEATURE CANDIDATE / CI TESTS REQUIRED / HOME NOT TESTED.** Do not claim PRODUCTION.
+
+## Optional private full ComfyUI logs
+The Configurator offers an **unchecked opt-in** to archive the exact local raw ComfyUI log under `DataRoot\private`. Raw logs can contain client prompts, private paths, API keys and other sensitive data, so the checkbox is not automatic and the user must review files before granting ChatGPT Work access. Individual files capped at 20MiB; folder capped at 20 logs / 200MiB. Failed copy leaves a normalized UNAVAILABLE source; nothing is uploaded.
