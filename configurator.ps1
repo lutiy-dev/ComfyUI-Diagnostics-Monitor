@@ -5,7 +5,8 @@ param(
  [ValidateSet('HOME','WORK')][string]$Machine='HOME',
  [string]$DataRoot=(Join-Path $env:LOCALAPPDATA 'ComfyUI-Diagnostics'),
  [string]$ComfyLog='',
- [switch]$SelfTest
+ [switch]$SelfTest,
+ [switch]$CaptureSelfTest
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -121,11 +122,23 @@ $button.Add_Click({
   $localMessage=$_.Exception.Message
   if($localMessage.Length -gt 350){$localMessage=$localMessage.Substring(0,350)+'...'}
   $status.Text="FAIL: $localMessage"
-  [void][Windows.Forms.MessageBox]::Show($localMessage,'Capture Evidence — FAILED',[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Error)
+  if(-not $SelfTest){[void][Windows.Forms.MessageBox]::Show($localMessage,'Capture Evidence — FAILED',[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Error)}
  } finally { $button.Enabled=$true }
 })
 if($SelfTest) {
  if($null -eq $checks.Windows -or -not $button.Enabled -or $hours.Value -ne 3){throw 'FAIL: Configurator controls'}
+ if($CaptureSelfTest){
+  foreach($key in @($checks.Keys)){$checks[$key].Checked=$false}
+  $before=@(Get-ChildItem -LiteralPath (Join-Path $DataRoot 'evidence') -Filter 'evidence_*.json' -File -ErrorAction SilentlyContinue).Count
+  $window.Show()
+  [Windows.Forms.Application]::DoEvents()
+  $button.PerformClick()
+  $after=@(Get-ChildItem -LiteralPath (Join-Path $DataRoot 'evidence') -Filter 'evidence_*.json' -File -ErrorAction SilentlyContinue).Count
+  if($after -le $before -or -not $status.Text.StartsWith('PASS:')){throw ('FAIL: Configurator capture test: '+$status.Text)}
+  $window.Hide()
+  Write-Host 'PASS: Configurator button created and verified an evidence snapshot'
+ }
+
  $window.Dispose()
  if($null -ne $script:configIcon){$script:configIcon.Dispose()}
  Write-Host 'PASS: Configurator controls initialized'
