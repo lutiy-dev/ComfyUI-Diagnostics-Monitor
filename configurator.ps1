@@ -17,6 +17,12 @@ if($ComfyLog -eq '') {
  }
 }
 $window=New-Object Windows.Forms.Form
+$script:configIcon=$null
+$iconPath=Join-Path $PSScriptRoot 'app.ico'
+if(Test-Path -LiteralPath $iconPath -PathType Leaf){
+ $script:configIcon=[Drawing.Icon]::new($iconPath)
+ $window.Icon=$script:configIcon
+}
 $window.Text="ComfyUI Diagnostics Configurator · $Machine · LAB v0.6"
 $window.Size=[Drawing.Size]::new(720,650)
 $window.MinimumSize=$window.Size
@@ -102,7 +108,9 @@ $button.Add_Click({
 if($SelfTest) {
  if($null -eq $checks.Windows -or -not $button.Enabled -or $hours.Value -ne 3){throw 'FAIL: Configurator controls'}
  $window.Dispose()
+ if($null -ne $script:configIcon){$script:configIcon.Dispose()}
  Write-Host 'PASS: Configurator controls initialized'
  return
 }
 [void]$window.ShowDialog()
+if($null -ne $script:configIcon){$script:configIcon.Dispose()}
