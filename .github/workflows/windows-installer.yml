@@ -42,6 +42,7 @@ jobs:
             if (-not (Test-Path -LiteralPath $f)) { throw "Missing package input: $f" }
             Copy-Item -LiteralPath $f -Destination (Join-Path $stage $f)
           }
+          & .\tools\package-security-gate.ps1 -PackageRoot $stage -OutputManifest 'package-manifest.json'
           Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.5.zip' -CompressionLevel Optimal
           (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.5.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.5.sha256'
       - uses: actions/upload-artifact@v4
@@ -50,4 +51,5 @@ jobs:
           path: |
             ComfyUI-Diagnostics-LAB-v0.5.zip
             ComfyUI-Diagnostics-LAB-v0.5.sha256
+            package-manifest.json
           if-no-files-found: error
