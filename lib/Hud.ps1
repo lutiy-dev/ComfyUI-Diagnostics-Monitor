@@ -4,6 +4,7 @@ function Initialize-Hud {
     $script:hudVisible=$false
     $script:hudDragging=$false
     $script:hud=New-Object System.Windows.Forms.Form
+    if($null -ne $script:appIcon){$script:hud.Icon=$script:appIcon}
     $script:hud.Name='ComfyUICompactHUD'
     $script:hud.Text='ComfyUI Diagnostics HUD'
     $script:hud.FormBorderStyle=[System.Windows.Forms.FormBorderStyle]::None
