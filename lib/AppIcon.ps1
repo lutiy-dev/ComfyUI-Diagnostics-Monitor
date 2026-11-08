@@ -6,14 +6,14 @@ function New-ComfyDiagnosticsIcon {
  Add-Type -AssemblyName System.Drawing
  $images=New-Object 'System.Collections.Generic.List[byte[]]'
  foreach($size in @(32,48,256)) {
-  $bitmap=New-Object System.Drawing.Bitmap($size,$size,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $bitmap=[Drawing.Bitmap]::new($size,$size,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $graphics=[Drawing.Graphics]::FromImage($bitmap)
   $graphics.SmoothingMode=[Drawing.Drawing2D.SmoothingMode]::AntiAlias
   $graphics.Clear([Drawing.Color]::Transparent)
-  $dark=New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(255,20,26,34))
-  $cyan=New-Object Drawing.Pen([Drawing.Color]::FromArgb(255,36,195,249),([single]($size*0.065)))
-  $orange=New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(255,246,151,40))
-  $rim=New-Object Drawing.Pen([Drawing.Color]::FromArgb(255,84,100,117),([single]($size*0.04)))
+  $dark=[Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(255,20,26,34))
+  $cyan=[Drawing.Pen]::new([Drawing.Color]::FromArgb(255,36,195,249),[single]($size*0.065))
+  $orange=[Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(255,246,151,40))
+  $rim=[Drawing.Pen]::new([Drawing.Color]::FromArgb(255,84,100,117),[single]($size*0.04))
   try {
    $graphics.FillRectangle($dark,0,0,$size,$size)
    $margin=[single]($size*0.09)
@@ -42,7 +42,7 @@ function New-ComfyDiagnosticsIcon {
  $directory=Split-Path -Parent $Path
  if(-not (Test-Path -LiteralPath $directory)){ $null=New-Item -ItemType Directory -Force -Path $directory }
  $file=[IO.File]::Open($Path,[IO.FileMode]::Create,[IO.FileAccess]::Write)
- $writer=New-Object IO.BinaryWriter($file)
+ $writer=[IO.BinaryWriter]::new($file)
  try {
   $writer.Write([uint16]0)
   $writer.Write([uint16]1)
