@@ -116,7 +116,7 @@ $button.Add_Click({
   $record=Get-Content -LiteralPath $latest.FullName -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop
   if($record.kind -ne 'evidence_snapshot' -or $record.schema -ne 2){throw 'Created JSON failed evidence schema verification'}
   $status.ForeColor=[Drawing.Color]::LightGreen
-  $status.Text="PASS: $($latest.Name) — $($latest.Length) bytes"
+  $status.Text="PASS: $($latest.Name) - $($latest.Length) bytes"
  } catch {
   $status.ForeColor=[Drawing.Color]::OrangeRed
   $localMessage=$_.Exception.Message
