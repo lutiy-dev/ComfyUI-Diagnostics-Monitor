@@ -24,7 +24,7 @@ if(Test-Path -LiteralPath $iconPath -PathType Leaf){
  $window.Icon=$script:configIcon
 }
 $window.Text="ComfyUI Diagnostics Configurator · $Machine · LAB v0.6"
-$window.Size=[Drawing.Size]::new(720,650)
+$window.Size=[Drawing.Size]::new(720,690)
 $window.MinimumSize=$window.Size
 $window.MaximumSize=$window.Size
 $window.StartPosition='CenterScreen'
@@ -82,7 +82,7 @@ $open.Text='Open Evidence Folder'
 $open.Location=[Drawing.Point]::new(245,458)
 $open.Size=[Drawing.Size]::new(214,41)
 $window.Controls.Add($open)
-$status=LabelText 'Ready — all captures are manually triggered.' 21 484 645 45
+$status=LabelText 'Ready — all captures are manually triggered.' 21 515 645 72
 $open.Add_Click({
  $path=Join-Path $DataRoot 'evidence'
  $null=New-Item -ItemType Directory -Path $path -Force
@@ -90,19 +90,38 @@ $open.Add_Click({
 })
 $button.Add_Click({
  $button.Enabled=$false
- $status.Text='Capturing. This may take several seconds.'
+ $status.Text='Capturing evidence...'
  $window.Refresh()
  try {
-  $arguments=@('-Machine',$Machine,'-DataRoot',$DataRoot,'-ComfyLog',$logBox.Text,'-Hours',[int]$hours.Value)
-  foreach($key in @($checks.Keys)){
-   if(-not $checks[$key].Checked){$arguments+=('-Skip'+$key)}
+  $evidenceDir=Join-Path $DataRoot 'evidence'
+  $before=@(Get-ChildItem -LiteralPath $evidenceDir -Filter 'evidence_*.json' -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+  $params=@{
+   Machine=$Machine
+   DataRoot=$DataRoot
+   ComfyLog=$logBox.Text
+   Hours=[int]$hours.Value
+   SkipWindows=(-not $checks.Windows.Checked)
+   SkipProcesses=(-not $checks.Processes.Checked)
+   SkipStorage=(-not $checks.Storage.Checked)
+   SkipComfy=(-not $checks.Comfy.Checked)
+   ArchiveComfyLog=[bool]$rawLog.Checked
   }
-  if($rawLog.Checked){$arguments+='-ArchiveComfyLog'}
   $path=Join-Path $PSScriptRoot 'evidence.ps1'
-  & $path @arguments
-  $status.Text="PASS: Snapshot saved under $DataRoot\evidence"
+  if(-not (Test-Path -LiteralPath $path -PathType Leaf)){throw "Evidence script missing: $path"}
+  & $path @params
+  $new=@(Get-ChildItem -LiteralPath $evidenceDir -Filter 'evidence_*.json' -File -ErrorAction Stop | Where-Object { $_.FullName -notin $before })
+  if($new.Count -eq 0) {throw 'No new evidence JSON file was created'}
+  $latest=$new|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 1
+  $record=Get-Content -LiteralPath $latest.FullName -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop
+  if($record.kind -ne 'evidence_snapshot' -or $record.schema -ne 2){throw 'Created JSON failed evidence schema verification'}
+  $status.ForeColor=[Drawing.Color]::LightGreen
+  $status.Text="PASS: $($latest.Name) — $($latest.Length) bytes"
  } catch {
-  $status.Text='FAIL: Capture failed. Inspect console error; no automatic retry.'
+  $status.ForeColor=[Drawing.Color]::OrangeRed
+  $localMessage=$_.Exception.Message
+  if($localMessage.Length -gt 350){$localMessage=$localMessage.Substring(0,350)+'...'}
+  $status.Text="FAIL: $localMessage"
+  [void][Windows.Forms.MessageBox]::Show($localMessage,'Capture Evidence — FAILED',[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Error)
  } finally { $button.Enabled=$true }
 })
 if($SelfTest) {
