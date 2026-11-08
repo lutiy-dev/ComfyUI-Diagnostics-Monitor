@@ -18,7 +18,7 @@ if($ComfyLog -eq '') {
 }
 $window=New-Object Windows.Forms.Form
 $window.Text="ComfyUI Diagnostics Configurator · $Machine · LAB v0.6"
-$window.Size=[Drawing.Size]::new(720,590)
+$window.Size=[Drawing.Size]::new(720,650)
 $window.MinimumSize=$window.Size
 $window.MaximumSize=$window.Size
 $window.StartPosition='CenterScreen'
@@ -59,14 +59,21 @@ foreach($item in $items) {
  $cb.Size=[Drawing.Size]::new(640,28)
  $window.Controls.Add($cb);$checks[$item[1]]=$cb
 }
+$rawLog=New-Object Windows.Forms.CheckBox
+$rawLog.Text='Include private RAW ComfyUI log (may contain secrets; never auto-upload)'
+$rawLog.Checked=$false
+$rawLog.Location=[Drawing.Point]::new(21,413)
+$rawLog.Size=[Drawing.Size]::new(655,31)
+$rawLog.ForeColor=[Drawing.Color]::Orange
+$window.Controls.Add($rawLog)
 $button=New-Object Windows.Forms.Button
 $button.Text='Capture Evidence'
-$button.Location=[Drawing.Point]::new(21,428)
+$button.Location=[Drawing.Point]::new(21,458)
 $button.Size=[Drawing.Size]::new(208,41)
 $window.Controls.Add($button)
 $open=New-Object Windows.Forms.Button
 $open.Text='Open Evidence Folder'
-$open.Location=[Drawing.Point]::new(245,428)
+$open.Location=[Drawing.Point]::new(245,458)
 $open.Size=[Drawing.Size]::new(214,41)
 $window.Controls.Add($open)
 $status=LabelText 'Ready — all captures are manually triggered.' 21 484 645 45
@@ -84,6 +91,7 @@ $button.Add_Click({
   foreach($key in @($checks.Keys)){
    if(-not $checks[$key].Checked){$arguments+=('-Skip'+$key)}
   }
+  if($rawLog.Checked){$arguments+='-ArchiveComfyLog'}
   $path=Join-Path $PSScriptRoot 'evidence.ps1'
   & $path @arguments
   $status.Text="PASS: Snapshot saved under $DataRoot\evidence"
