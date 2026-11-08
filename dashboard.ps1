@@ -295,10 +295,36 @@ $timer.Add_Tick({
         if ($script:hudVisible) { $script:hud.Invalidate() }
     } catch { $status.Text='Monitor UI warning (see PowerShell console)' }
 })
-$form.Add_FormClosing({ $script:closing=$true; $timer.Stop(); Safe-Disconnect; $script:hud.Close(); $script:hud.Dispose(); $script:message.Dispose() })
+# Keep the WinForms message loop alive when the main window is hidden for HUD.
+# ShowDialog() exits on Hide(), causing the PowerShell process to terminate.
+$script:tray=New-Object System.Windows.Forms.NotifyIcon
+$script:tray.Icon=[Drawing.SystemIcons]::Application
+$script:tray.Text='ComfyUI Diagnostics HOME/WORK - restore'
+$script:tray.Visible=$true
+$trayMenu=New-Object System.Windows.Forms.ContextMenuStrip
+$restoreItem=$trayMenu.Items.Add('Restore Dashboard')
+$exitItem=$trayMenu.Items.Add('Exit Dashboard')
+$restoreItem.Add_Click({ Switch-ToFullDashboard })
+$exitItem.Add_Click({ $script:form.Close() })
+$script:tray.ContextMenuStrip=$trayMenu
+$script:tray.Add_DoubleClick({ Switch-ToFullDashboard })
+$form.Add_FormClosing({
+    $script:closing=$true
+    $timer.Stop()
+    $script:tray.Visible=$false
+    $script:tray.Dispose()
+    $trayMenu.Dispose()
+    Safe-Disconnect
+    $script:hud.Close()
+    $script:hud.Dispose()
+    $script:message.Dispose()
+})
 if ($SelfTest) {
     if (-not $form.TopMost -or -not $script:hud.TopMost -or $script:hud.TransparencyKey -ne [Drawing.Color]::Magenta) { throw 'HUD configuration FAILED' }
     $timer.Dispose()
+    $script:tray.Visible=$false
+    $script:tray.Dispose()
+    $trayMenu.Dispose()
     $script:hud.Dispose()
     $form.Dispose()
     $script:message.Dispose()
@@ -306,4 +332,6 @@ if ($SelfTest) {
     return
 }
 $timer.Start()
-[void]$form.ShowDialog()
+# ApplicationContext preserves process lifetime while Dashboard is hidden.
+$context=New-Object System.Windows.Forms.ApplicationContext($form)
+[System.Windows.Forms.Application]::Run($context)
