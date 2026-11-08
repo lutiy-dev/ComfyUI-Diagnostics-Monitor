@@ -17,7 +17,7 @@ if ($InstallRoot -eq [IO.Path]::GetPathRoot($InstallRoot) -or $DataRoot -eq [IO.
     throw 'A filesystem root is not an acceptable destination'
 }
 if ($InstallRoot -eq $source) { throw 'InstallRoot must differ from source' }
-$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py')
+$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','lib\AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py')
 foreach($file in $payload) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $file) -PathType Leaf)) { throw "Missing payload file: $file" }
 }
@@ -31,6 +31,9 @@ $null=New-Item -ItemType Directory -Force -Path $DataRoot
 foreach ($file in $payload) {
     Copy-Item -LiteralPath (Join-Path $source $file) -Destination (Join-Path $InstallRoot $file) -Force
 }
+# Brand icon is generated locally from inspectable PowerShell source.
+. (Join-Path $InstallRoot 'lib\AppIcon.ps1')
+New-ComfyDiagnosticsIcon -Path (Join-Path $InstallRoot 'app.ico')
 $launch=@'
 [CmdletBinding()]
 param([ValidateSet('Dashboard','Collector','Configurator','Evidence')][string]$Mode='Dashboard',[switch]$SelfTest)
@@ -73,6 +76,7 @@ if (-not $NoShortcuts) {
         $lnk.TargetPath=(Join-Path $PSHOME 'powershell.exe')
         $lnk.Arguments='-NoProfile -STA -ExecutionPolicy Bypass -File "'+(Join-Path $InstallRoot 'launch.ps1')+'" -Mode '+$entry[1]
         $lnk.WorkingDirectory=$InstallRoot
+        $lnk.IconLocation=(Join-Path $InstallRoot 'app.ico')+',0'
         $lnk.Save()
     }
 }
