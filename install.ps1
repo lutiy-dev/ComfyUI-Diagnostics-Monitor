@@ -17,7 +17,7 @@ if ($InstallRoot -eq [IO.Path]::GetPathRoot($InstallRoot) -or $DataRoot -eq [IO.
     throw 'A filesystem root is not an acceptable destination'
 }
 if ($InstallRoot -eq $source) { throw 'InstallRoot must differ from source' }
-$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1')
+$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','evidence.ps1','configurator.ps1')
 foreach($file in $payload) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $file) -PathType Leaf)) { throw "Missing payload file: $file" }
 }
@@ -33,11 +33,15 @@ foreach ($file in $payload) {
 }
 $launch=@'
 [CmdletBinding()]
-param([ValidateSet('Dashboard','Collector')][string]$Mode='Dashboard',[switch]$SelfTest)
+param([ValidateSet('Dashboard','Collector','Configurator','Evidence')][string]$Mode='Dashboard',[switch]$SelfTest)
 $ErrorActionPreference='Stop'
 $config=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json
 if ($Mode -eq 'Dashboard') {
     & (Join-Path $PSScriptRoot 'dashboard.ps1') -Machine $config.machine -DataDir $config.data_root -SelfTest:$SelfTest
+} elseif ($Mode -eq 'Configurator') {
+    & (Join-Path $PSScriptRoot 'configurator.ps1') -Machine $config.machine -DataRoot $config.data_root -ComfyLog $config.comfy_log -SelfTest:$SelfTest
+} elseif ($Mode -eq 'Evidence') {
+    & (Join-Path $PSScriptRoot 'evidence.ps1') -Machine $config.machine -DataRoot $config.data_root -ComfyLog $config.comfy_log -SkipWindows -SkipStorage -SkipProcesses -SkipComfy -SelfTest:$SelfTest
 } elseif (-not $SelfTest) {
     & (Join-Path $PSScriptRoot 'collector.ps1') -Machine $config.machine -DataDir $config.data_root -ComfyLog $config.comfy_log
 } else { Write-Host 'PASS: collector configuration available' }
@@ -52,7 +56,7 @@ $config=[ordered]@{
 [IO.File]::WriteAllText((Join-Path $InstallRoot 'config.json'),($config|ConvertTo-Json -Depth 3),(New-Object Text.UTF8Encoding($false)))
 $manifest=[ordered]@{
     product='ComfyUI-Diagnostics'
-    version='0.5.0-LAB'
+    version='0.6.0-LAB'
     installed_utc=[DateTime]::UtcNow.ToString('o')
     install_root=$InstallRoot
     data_root=$DataRoot
@@ -64,7 +68,7 @@ if (-not $NoShortcuts) {
     $start=Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\ComfyUI Diagnostics LAB'
     $null=New-Item -ItemType Directory -Force -Path $start
     $shell=New-Object -ComObject WScript.Shell
-    foreach($entry in @(@('Dashboard','Dashboard'),@('Collector','Collector'))) {
+    foreach($entry in @(@('Dashboard','Dashboard'),@('Collector','Collector'),@('Configurator','Configurator'))) {
         $lnk=$shell.CreateShortcut((Join-Path $start ($entry[0]+'.lnk')))
         $lnk.TargetPath=(Join-Path $PSHOME 'powershell.exe')
         $lnk.Arguments='-NoProfile -STA -ExecutionPolicy Bypass -File "'+(Join-Path $InstallRoot 'launch.ps1')+'" -Mode '+$entry[1]
