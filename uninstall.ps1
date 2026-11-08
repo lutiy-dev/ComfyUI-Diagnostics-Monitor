@@ -13,7 +13,7 @@ if ($manifest.product -ne 'ComfyUI-Diagnostics' -or $manifest.install_root -ne $
     throw 'STOP: installation manifest does not match target'
 }
 # Whitelist files installed by this project; do not remove arbitrary user files.
-foreach($f in @('collector.ps1','dashboard.ps1','merge_to_sqlite.py','launch.ps1','config.json','installation.json','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py')) {
+foreach($f in @('collector.ps1','dashboard.ps1','merge_to_sqlite.py','launch.ps1','config.json','installation.json','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','lib\AppIcon.ps1','app.ico','evidence.ps1','configurator.ps1','analyze_evidence.py')) {
     $path=Join-Path $InstallRoot $f
     if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
 }
