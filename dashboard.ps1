@@ -4,7 +4,8 @@ param(
   [ValidateSet('HOME','WORK')][string]$Machine='HOME',
   [string]$DataDir="$env:LOCALAPPDATA\ComfyUI-Diagnostics",
   [string]$ComfyUrl='http://127.0.0.1:8188',
-  [switch]$SelfTest
+  [switch]$SelfTest,
+  [switch]$HudSelfTest
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -331,7 +332,39 @@ if ($SelfTest) {
     Write-Host 'PASS: WinForms Dashboard controls created'
     return
 }
+if ($HudSelfTest) {
+    # Windows CI regression: switch windows while application message loop remains alive.
+    $script:hudTestPhase=0
+    $script:hudTestResult='FAIL: HUD message-loop smoke test never finished'
+    $script:hudTestTimer=New-Object System.Windows.Forms.Timer
+    $script:hudTestTimer.Interval=300
+    $script:hudTestTimer.Add_Tick({
+        try {
+            $script:hudTestPhase++
+            if ($script:hudTestPhase -eq 1) {
+                Switch-ToHud
+                if (-not $script:hudVisible -or -not $script:hud.Visible -or $script:form.Visible) { throw 'HUD transition failed' }
+            } elseif ($script:hudTestPhase -eq 2) {
+                Switch-ToFullDashboard
+                if ($script:hudVisible -or -not $script:form.Visible) { throw 'Dashboard restore failed' }
+                $script:hudTestResult='PASS: HUD hide/restore maintained WinForms message loop'
+                $script:hudTestTimer.Stop()
+                $script:form.Close()
+            }
+        } catch {
+            $script:hudTestResult='FAIL: '+$_.Exception.Message
+            $script:hudTestTimer.Stop()
+            $script:form.Close()
+        }
+    })
+    $script:hudTestTimer.Start()
+}
 $timer.Start()
 # ApplicationContext preserves process lifetime while Dashboard is hidden.
 $context=New-Object System.Windows.Forms.ApplicationContext($form)
 [System.Windows.Forms.Application]::Run($context)
+if ($HudSelfTest) {
+    $script:hudTestTimer.Dispose()
+    if (-not $script:hudTestResult.StartsWith('PASS:')) { throw $script:hudTestResult }
+    Write-Host $script:hudTestResult
+}
