@@ -345,7 +345,8 @@ $timer.Add_Tick({
 # Keep the WinForms message loop alive when the main window is hidden for HUD.
 # ShowDialog() exits on Hide(), causing the PowerShell process to terminate.
 $script:tray=New-Object System.Windows.Forms.NotifyIcon
-$script:tray.Icon=if($null -ne $script:appIcon){$script:appIcon}else{[Drawing.SystemIcons]::Application}
+$script:tray.Icon=[Drawing.SystemIcons]::Application
+if($null -ne $script:appIcon){$script:tray.Icon=$script:appIcon}
 $script:tray.Text='ComfyUI Diagnostics HOME/WORK - restore'
 $script:tray.Visible=$true
 $trayMenu=New-Object System.Windows.Forms.ContextMenuStrip
