@@ -99,6 +99,26 @@ if (-not $SkipWindows) {
  $report.sources.events_application=@{status='DISABLED'}
  $report.sources.reliability=@{status='DISABLED'}
 }
+# Parse known version fields without exporting full startup log lines.
+SourceResult 'environment' {
+ $versions=[ordered]@{python='UNKNOWN';pytorch='UNKNOWN';comfyui='UNKNOWN';cuda='UNKNOWN';aimdo='UNKNOWN'}
+ if($ComfyLog -and (Test-Path -LiteralPath $ComfyLog -PathType Leaf)){
+  foreach($line in @(Get-Content -LiteralPath $ComfyLog -TotalCount 600 -ErrorAction Stop)){
+   foreach($key in @($versions.Keys)){
+    if($versions[$key] -ne 'UNKNOWN'){continue}
+    $pattern=switch($key){
+     'python' {'(?i)Python version\s*[:=]\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)'}
+     'pytorch' {'(?i)(?:PyTorch|Torch) version\s*[:=]\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:\+cu[0-9]+)?)'}
+     'comfyui' {'(?i)ComfyUI version\s*[:=]\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)'}
+     'cuda' {'(?i)CUDA version\s*[:=]\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)'}
+     'aimdo' {'(?i)comfy-aimdo\s*(?:version)?\s*[:= ]\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)'}
+    }
+    if($line -match $pattern){$versions[$key]=$Matches[1]}
+   }
+  }
+ }
+ return $versions
+}
 if (-not $SkipComfy) {
  SourceResult 'comfy_queue' {
   $result=Invoke-RestMethod -Uri 'http://127.0.0.1:8188/queue' -TimeoutSec 3 -ErrorAction Stop
