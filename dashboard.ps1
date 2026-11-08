@@ -4,7 +4,8 @@ param(
   [ValidateSet('HOME','WORK')][string]$Machine='HOME',
   [string]$DataDir="$env:LOCALAPPDATA\ComfyUI-Diagnostics",
   [string]$ComfyUrl='http://127.0.0.1:8188',
-  [switch]$SelfTest
+  [switch]$SelfTest,
+  [switch]$HudSelfTest
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -295,15 +296,75 @@ $timer.Add_Tick({
         if ($script:hudVisible) { $script:hud.Invalidate() }
     } catch { $status.Text='Monitor UI warning (see PowerShell console)' }
 })
-$form.Add_FormClosing({ $script:closing=$true; $timer.Stop(); Safe-Disconnect; $script:hud.Close(); $script:hud.Dispose(); $script:message.Dispose() })
+# Keep the WinForms message loop alive when the main window is hidden for HUD.
+# ShowDialog() exits on Hide(), causing the PowerShell process to terminate.
+$script:tray=New-Object System.Windows.Forms.NotifyIcon
+$script:tray.Icon=[Drawing.SystemIcons]::Application
+$script:tray.Text='ComfyUI Diagnostics HOME/WORK - restore'
+$script:tray.Visible=$true
+$trayMenu=New-Object System.Windows.Forms.ContextMenuStrip
+$restoreItem=$trayMenu.Items.Add('Restore Dashboard')
+$exitItem=$trayMenu.Items.Add('Exit Dashboard')
+$restoreItem.Add_Click({ Switch-ToFullDashboard })
+$exitItem.Add_Click({ $script:form.Close() })
+$script:tray.ContextMenuStrip=$trayMenu
+$script:tray.Add_DoubleClick({ Switch-ToFullDashboard })
+$form.Add_FormClosing({
+    $script:closing=$true
+    $timer.Stop()
+    $script:tray.Visible=$false
+    $script:tray.Dispose()
+    $trayMenu.Dispose()
+    Safe-Disconnect
+    $script:hud.Close()
+    $script:hud.Dispose()
+    $script:message.Dispose()
+})
 if ($SelfTest) {
     if (-not $form.TopMost -or -not $script:hud.TopMost -or $script:hud.TransparencyKey -ne [Drawing.Color]::Magenta) { throw 'HUD configuration FAILED' }
     $timer.Dispose()
+    $script:tray.Visible=$false
+    $script:tray.Dispose()
+    $trayMenu.Dispose()
     $script:hud.Dispose()
     $form.Dispose()
     $script:message.Dispose()
     Write-Host 'PASS: WinForms Dashboard controls created'
     return
 }
+if ($HudSelfTest) {
+    # Windows CI regression: switch windows while application message loop remains alive.
+    $script:hudTestPhase=0
+    $script:hudTestResult='FAIL: HUD message-loop smoke test never finished'
+    $script:hudTestTimer=New-Object System.Windows.Forms.Timer
+    $script:hudTestTimer.Interval=300
+    $script:hudTestTimer.Add_Tick({
+        try {
+            $script:hudTestPhase++
+            if ($script:hudTestPhase -eq 1) {
+                Switch-ToHud
+                if (-not $script:hudVisible -or -not $script:hud.Visible -or $script:form.Visible) { throw 'HUD transition failed' }
+            } elseif ($script:hudTestPhase -eq 2) {
+                Switch-ToFullDashboard
+                if ($script:hudVisible -or -not $script:form.Visible) { throw 'Dashboard restore failed' }
+                $script:hudTestResult='PASS: HUD hide/restore maintained WinForms message loop'
+                $script:hudTestTimer.Stop()
+                $script:form.Close()
+            }
+        } catch {
+            $script:hudTestResult='FAIL: '+$_.Exception.Message
+            $script:hudTestTimer.Stop()
+            $script:form.Close()
+        }
+    })
+    $script:hudTestTimer.Start()
+}
 $timer.Start()
-[void]$form.ShowDialog()
+# ApplicationContext preserves process lifetime while Dashboard is hidden.
+$context=New-Object System.Windows.Forms.ApplicationContext($form)
+[System.Windows.Forms.Application]::Run($context)
+if ($HudSelfTest) {
+    $script:hudTestTimer.Dispose()
+    if (-not $script:hudTestResult.StartsWith('PASS:')) { throw $script:hudTestResult }
+    Write-Host $script:hudTestResult
+}

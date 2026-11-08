@@ -26,6 +26,10 @@ jobs:
       - name: Windows Forms initialization smoke test
         shell: powershell
         run: .\dashboard.ps1 -SelfTest -DataDir $env:RUNNER_TEMP
+      - name: Windows HUD show/hide/restore regression
+        shell: powershell
+        timeout-minutes: 2
+        run: .\dashboard.ps1 -HudSelfTest -DataDir $env:RUNNER_TEMP
       - name: Test SQLite importer
         shell: pwsh
         run: python -m unittest discover -s tests -v

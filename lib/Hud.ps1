@@ -77,10 +77,22 @@ function Initialize-Hud {
 }
 function Switch-ToHud {
     if ($script:hudVisible) { return }
-    $script:hudVisible=$true
-    $script:form.Hide()
-    $script:hud.Show()
-    $script:hud.BringToFront()
+    # Keep the full dashboard visible until the HUD has a window handle.
+    # If HUD creation fails, do not leave the user with no visible window.
+    try {
+        $script:hud.Show()
+        if (-not $script:hud.Visible) { throw 'HUD did not become visible' }
+        $script:hud.BringToFront()
+        $script:hudVisible=$true
+        $script:form.Hide()
+    } catch {
+        $script:hudVisible=$false
+        $script:hud.Hide()
+        $script:form.WindowState=[Windows.Forms.FormWindowState]::Normal
+        $script:form.Show()
+        $script:form.Activate()
+        Write-Warning 'HUD unavailable; Dashboard restored'
+    }
 }
 function Switch-ToFullDashboard {
     if (-not $script:hudVisible) { return }
