@@ -23,6 +23,9 @@ jobs:
       - name: Test WebSocket event parsing
         shell: powershell
         run: .\tests\test_live.ps1
+      - name: Offline update checker unit tests
+        shell: powershell
+        run: .\tests\test_updates.ps1
       - name: Windows Forms initialization smoke test
         shell: powershell
         run: .\dashboard.ps1 -SelfTest -DataDir $env:RUNNER_TEMP
