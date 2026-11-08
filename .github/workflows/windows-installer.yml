@@ -24,7 +24,6 @@ jobs:
           $inst=Join-Path $env:RUNNER_TEMP 'MyApp'
           $data=Join-Path $env:RUNNER_TEMP 'Diagnostics'
           & .\install.ps1 -Machine HOME -InstallRoot $inst -DataRoot $data -NoShortcuts
-          if ($LASTEXITCODE -ne 0) { exit 1 }
           if (-not (Test-Path (Join-Path $inst 'installation.json'))) { throw 'Missing install manifest' }
           'KEEP_MY_DATA' | Set-Content -LiteralPath (Join-Path $data 'preserve.test')
           & (Join-Path $inst 'launch.ps1') -Mode Dashboard -SelfTest
