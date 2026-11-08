@@ -3,7 +3,8 @@
 param(
   [ValidateSet('HOME','WORK')][string]$Machine='HOME',
   [string]$DataDir="$env:LOCALAPPDATA\ComfyUI-Diagnostics",
-  [string]$ComfyUrl='http://127.0.0.1:8188'
+  [string]$ComfyUrl='http://127.0.0.1:8188',
+  [switch]$SelfTest
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -275,5 +276,12 @@ $timer.Add_Tick({
     } catch { $status.Text='Monitor UI warning (see PowerShell console)' }
 })
 $form.Add_FormClosing({ $script:closing=$true; $timer.Stop(); Safe-Disconnect; $script:message.Dispose() })
+if ($SelfTest) {
+    $timer.Dispose()
+    $form.Dispose()
+    $script:message.Dispose()
+    Write-Host 'PASS: WinForms Dashboard controls created'
+    return
+}
 $timer.Start()
 [void]$form.ShowDialog()
