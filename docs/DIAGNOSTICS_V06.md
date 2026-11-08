@@ -51,3 +51,10 @@ LAB user-level ZIP, *not signed EXE/MSI*. SHA-256 and file manifest produced in 
 
 ## Optional private full ComfyUI logs
 The Configurator offers an **unchecked opt-in** to archive the exact local raw ComfyUI log under `DataRoot\private`. Raw logs can contain client prompts, private paths, API keys and other sensitive data, so the checkbox is not automatic and the user must review files before granting ChatGPT Work access. Individual files capped at 20MiB; folder capped at 20 logs / 200MiB. Failed copy leaves a normalized UNAVAILABLE source; nothing is uploaded.
+
+## Windows brand icon + artifact packaging fix (2026-11-09)
+The generated Windows icon is a locally generated original cyan waveform with orange status dot on a dark monitor background. `lib/AppIcon.ps1` generates `app.ico` with 32x32, 48x48, and 256x256 image entries at installation time; the icon is used by the Dashboard title/taskbar, notification tray, HUD window metadata, Configurator, and Start Menu shortcuts. No third-party font or binary asset is distributed.
+
+**Root cause of the broken v0.6 download**: first v0.6 GitHub Actions artifact uploaded old `v0.5` filenames (which no longer existed) and only `package-manifest.json`. Corrected upload to exactly `ComfyUI-Diagnostics-LAB-v0.6.zip`, `ComfyUI-Diagnostics-LAB-v0.6.sha256`, `package-manifest.json`. CI now extracts the inner ZIP and checks for `install.ps1`, `dashboard.ps1`, `configurator.ps1`, `lib/AppIcon.ps1` and the ZIP checksum before upload.
+
+**CI evidence**: Windows package run `42532468182` PASS, icon generated and parsed by Windows .NET, ZIP expanded and checksum matched; actual HOME/WORK taskbar/tray visual correctness remains NOT TESTED until user screenshots. Previously downloaded small artifact is BROKEN; re-download artifact from the corrected CI run. No `main` merge or Production Release.
