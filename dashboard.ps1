@@ -205,6 +205,7 @@ $incident.ForeColor=[Drawing.Color]::White
 $incident.Font=[Drawing.Font]::new('Consolas',9)
 $form.Controls.Add($incident)
 
+. (Join-Path $PSScriptRoot 'lib\Updates.ps1')
 . (Join-Path $PSScriptRoot 'lib\Hud.ps1')
 Initialize-Hud
 $hudButton=New-Object System.Windows.Forms.Button
@@ -216,6 +217,43 @@ $hudButton.ForeColor=[Drawing.Color]::White
 $hudButton.BackColor=[Drawing.Color]::FromArgb(42,55,68)
 $form.Controls.Add($hudButton)
 $hudButton.Add_Click({Switch-ToHud})
+$updatesButton=New-Object System.Windows.Forms.Button
+$updatesButton.Text='Check updates'
+$updatesButton.Location=[Drawing.Point]::new(626,12)
+$updatesButton.Size=[Drawing.Size]::new(152,34)
+$updatesButton.FlatStyle=[System.Windows.Forms.FlatStyle]::Flat
+$updatesButton.ForeColor=[Drawing.Color]::White
+$updatesButton.BackColor=[Drawing.Color]::FromArgb(42,55,68)
+$form.Controls.Add($updatesButton)
+$updatesButton.Add_Click({
+    $updatesButton.Enabled=$false
+    try {
+        $currentVersion='0.5.0-LAB'
+        $manifestPath=Join-Path $PSScriptRoot 'installation.json'
+        if (Test-Path -LiteralPath $manifestPath) {
+            try { $currentVersion=[string]((Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json).version) } catch {}
+        }
+        $result=Get-DiagnosticsReleaseStatus -CurrentVersion $currentVersion
+        if ($result.status -eq 'UPDATE_AVAILABLE') {
+            $answer=[Windows.Forms.MessageBox]::Show(
+                "New release $($result.version) found. Open the official GitHub release page? Automatic installation is disabled until signed updates and rollback are verified.",
+                'ComfyUI Diagnostics Updates',
+                [Windows.Forms.MessageBoxButtons]::YesNo,
+                [Windows.Forms.MessageBoxIcon]::Information)
+            if ($answer -eq [Windows.Forms.DialogResult]::Yes) {
+                [void][Diagnostics.Process]::Start($result.url)
+            }
+        } elseif ($result.status -eq 'UP_TO_DATE') {
+            [void][Windows.Forms.MessageBox]::Show("No newer published stable release. Current version: $currentVersion",'Updates')
+        } else {
+            [void][Windows.Forms.MessageBox]::Show('No verified update available. A network error or no published stable release may be the cause. Nothing was downloaded or installed.','Updates')
+        }
+    } catch {
+        [void][Windows.Forms.MessageBox]::Show('Update check failed; no changes made.','Updates')
+    } finally {
+        $updatesButton.Enabled=$true
+    }
+})
 $form.Add_KeyDown({param($sender,$e);if ($e.KeyCode -eq [Windows.Forms.Keys]::F9) { Switch-ToHud }})
 $form.Add_Resize({
     if (-not $script:closing -and -not $script:hudVisible -and $script:form.WindowState -eq [Windows.Forms.FormWindowState]::Minimized) {
