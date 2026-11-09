@@ -1,4 +1,4 @@
-# ComfyUI Diagnostics Evidence Capture v0.6 LAB. On-demand, local, read-only.
+# ComfyUI Diagnostics Evidence Capture v0.7 LAB candidate. On-demand, local, read-only.
 # Captures normalized technical metadata only. No prompts, raw event messages, dumps or file contents.
 [CmdletBinding()]
 param(
@@ -35,6 +35,8 @@ function SourceResult([string]$source,[scriptblock]$action,[switch]$AllowEmpty) 
    else { $count=1 }
   }
   $state='OK'
+  if ($source -eq 'environment' -and $value -and @($value.Values | Where-Object { $_ -eq 'UNKNOWN' }).Count -gt 0) { $state='PARTIAL' }
+  if ($source -eq 'comfy_log_evidence' -and $value -and $value.file_sha256 -eq 'UNKNOWN') { $state='PARTIAL' }
   if ($count -eq 0) { $state=if($AllowEmpty){'EMPTY'}else{'PARTIAL'}; $value=@() }
   $report.sources[$source]=@{status=$state;data=$value;count=$count;collected_utc=([DateTime]::UtcNow.ToString('o'));duration_ms=[int]([DateTime]::UtcNow-$start).TotalMilliseconds}
  } catch {
@@ -158,7 +160,25 @@ if (-not $SkipComfy) {
   $file=Get-Item -LiteralPath $ComfyLog
   $hits=@()
   $lineNo=0
-  foreach($line in @(Get-Content -LiteralPath $ComfyLog -Tail 1500 -ErrorAction Stop)) {
+  # Read a bounded tail while ComfyUI is still appending to the file.
+  $stream=[IO.File]::Open($ComfyLog,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+  try {
+   $take=[int][Math]::Min($stream.Length,1048576)
+   $offset=$stream.Length-$take
+   [void]$stream.Seek($offset,[IO.SeekOrigin]::Begin)
+   $buffer=New-Object byte[] $take
+   $read=0
+   while($read -lt $take){
+    $n=$stream.Read($buffer,$read,$take-$read)
+    if($n -eq 0){break}
+    $read+=$n
+   }
+  } finally { $stream.Dispose() }
+  $text=[Text.Encoding]::UTF8.GetString($buffer,0,$read)
+  $lines=@($text -split "`r?`n")
+  if($offset -gt 0 -and $lines.Count -gt 0){$lines=@($lines|Select-Object -Skip 1)}
+  $lines=@($lines|Select-Object -Last 1500)
+  foreach($line in $lines) {
    $lineNo++
    $code=$null
    if($line -match '(?i)CUDA.*(error|out of memory)'){$code='CUDA'}
@@ -171,7 +191,10 @@ if (-not $SkipComfy) {
     if($hits.Count -gt 100) { $hits=@($hits|Select-Object -Last 100) }
    }
   }
-  @{status='OK';file_size_bytes=$file.Length;file_modified_utc=$file.LastWriteTimeUtc.ToString('o');file_sha256=(Get-FileHash -LiteralPath $ComfyLog -Algorithm SHA256).Hash;tail_lines_scanned=$lineNo;signatures=$hits;raw_text_excluded=$true}
+  # Whole-file hashing is best-effort: a changing/locked log must not invalidate parsed error signatures.
+  $hash='UNKNOWN'
+  try {$hash=(Get-FileHash -LiteralPath $ComfyLog -Algorithm SHA256 -ErrorAction Stop).Hash} catch {}
+  @{status='OK';file_size_bytes=$file.Length;file_modified_utc=$file.LastWriteTimeUtc.ToString('o');file_sha256=$hash;tail_bytes_scanned=$read;tail_lines_scanned=$lineNo;signatures=$hits;raw_text_excluded=$true}
  }
 } else {
  $report.sources.comfy_queue=@{status='DISABLED'}
