@@ -1,6 +1,6 @@
 # ComfyUI Diagnostics Monitor
 
-**v0.6.0-LAB candidate · Windows 10/11 · READ-ONLY · LOCAL-FIRST · NOT PRODUCTION**
+**v0.7.0-LAB candidate · Windows 10/11 · READ-ONLY · LOCAL-FIRST · NOT PRODUCTION**
 
 A Windows diagnostic monitor and on-demand evidence recorder for NVIDIA/ComfyUI. Intended for investigating CUDA errors, GPU driver timeouts, application crashes and performance regressions without changing models, workflows, drivers or Windows settings.
 
@@ -35,6 +35,7 @@ Open/authorize the local diagnostic data folder when you want an investigation. 
 
 ## Documentation
 
+- [Evidence Reliability v0.7 — scope, tests and limitations](docs/DIAGNOSTICS_V07.md)
 - [Diagnostics v0.6 & scenario coverage](docs/DIAGNOSTICS_V06.md)
 - [Windows setup](docs/WINDOWS_INSTALL.md)
 - [HUD mode](docs/HUD_MODE.md)
