@@ -109,22 +109,41 @@ if (-not $SkipStorage) {
 if (-not $SkipWindows) {
  foreach($log in @('System','Application')) {
   $source='events_'+$log.ToLowerInvariant()
+  $script:eventQueryFailures=0
   SourceResult $source {
    $begin=(Get-Date).AddHours(-$Hours)
-   # Filter providers at the event-log query level so unrelated events cannot exhaust MaxEvents.
+   # Query each provider separately; a no-match must not invalidate other providers.
    $providers=if($log -eq 'System') {
-    @('Display','*WHEA*','*Kernel-Power*','disk','*storport*','*nvlddmkm*','*BugCheck*','*volmgr*','*Ntfs*','*Kernel-PnP*')
+    @('Display','Microsoft-Windows-WHEA-Logger','Microsoft-Windows-Kernel-Power','disk','storport','nvlddmkm','Microsoft-Windows-WER-SystemErrorReporting','volmgr','Ntfs','Microsoft-Windows-Kernel-PnP')
    } else {
-    @('Application Error','Windows Error Reporting','Application Hang','.NET Runtime','*Python*')
+    @('Application Error','Windows Error Reporting','Application Hang','.NET Runtime')
    }
-   $records=@(Get-WinEvent -FilterHashtable @{LogName=$log;StartTime=$begin;Level=@(1,2,3,4);ProviderName=$providers} -MaxEvents 350 -ErrorAction Stop)
-   $items=@()
-   foreach($ev in $records) {
-    $items+=@{time_utc=$ev.TimeCreated.ToUniversalTime().ToString('o');provider=[string]$ev.ProviderName;code=[int]$ev.Id;record_id=[long]$ev.RecordId;level=[int]$ev.Level;log=$log}
-    if($items.Count -ge 100){break}
+   $events=@()
+   $succeeded=0
+   foreach($provider in $providers) {
+    try {
+     $found=@(Get-WinEvent -FilterHashtable @{LogName=$log;StartTime=$begin;Level=@(1,2,3,4);ProviderName=$provider} -MaxEvents 100 -ErrorAction Stop)
+     $succeeded++
+     $events+=@($found)
+    } catch {
+     $errorId=[string]$_.FullyQualifiedErrorId
+     if($errorId -match 'NoMatchingEventsFound|NoProvidersFound|ProviderNotFound'){
+      $succeeded++
+     } else {
+      $script:eventQueryFailures++
+     }
+    }
    }
+   if($succeeded -eq 0){throw 'WINDOWS_EVENT_ALL_PROVIDER_QUERIES_FAILED'}
+   $items=@($events | Sort-Object -Property TimeCreated -Descending -Unique | Select-Object -First 100 | ForEach-Object {
+    @{time_utc=$_.TimeCreated.ToUniversalTime().ToString('o');provider=[string]$_.ProviderName;code=[int]$_.Id;record_id=[long]$_.RecordId;level=[int]$_.Level;log=$log}
+   })
    return ,$items
   } -AllowEmpty
+  if($script:eventQueryFailures -gt 0 -and $report.sources[$source].status -in @('OK','EMPTY')) {
+   $report.sources[$source].status='PARTIAL'
+   $report.sources[$source].error_code='WINDOWS_EVENT_PROVIDER_QUERIES_PARTIAL'
+  }
  }
  SourceResult 'reliability' {
   $rows=@(Get-CimInstance -Namespace root\cimv2 -ClassName Win32_ReliabilityRecords -ErrorAction Stop |
