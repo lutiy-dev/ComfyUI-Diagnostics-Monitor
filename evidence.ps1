@@ -93,7 +93,9 @@ if (-not $SkipProcesses) {
   $items=@(Get-Process -Name python,pythonw -ErrorAction SilentlyContinue | Select-Object -First 20)
   return ,@($items | ForEach-Object {
    $match=if($owners.Count -eq 1 -and [int]$owners[0] -eq $_.Id){'API_LISTENER_PID_MATCH'}else{'UNCONFIRMED'}
-   @{pid=$_.Id;process_name=$_.ProcessName;cpu_seconds=$_.CPU;working_set_mib=[math]::Round($_.WorkingSet64/1MB,1);private_memory_mib=[math]::Round($_.PrivateMemorySize64/1MB,1);association=$match;start_utc=$_.StartTime.ToUniversalTime().ToString('o')}
+   $started='UNKNOWN'
+   try { $started=$_.StartTime.ToUniversalTime().ToString('o') } catch {}
+   @{pid=$_.Id;process_name=$_.ProcessName;cpu_seconds=$_.CPU;working_set_mib=[math]::Round($_.WorkingSet64/1MB,1);private_memory_mib=[math]::Round($_.PrivateMemorySize64/1MB,1);association=$match;start_utc=$started}
   })
  }
 } else { $report.sources.process_memory=@{status='DISABLED'} }
@@ -115,7 +117,7 @@ if (-not $SkipWindows) {
    } else {
     @('Application Error','Windows Error Reporting','Application Hang','.NET Runtime','*Python*')
    }
-   $records=@(Get-WinEvent -FilterHashtable @{LogName=$log;StartTime=$begin;Level=@(1,2,3);ProviderName=$providers} -MaxEvents 350 -ErrorAction Stop)
+   $records=@(Get-WinEvent -FilterHashtable @{LogName=$log;StartTime=$begin;Level=@(1,2,3,4);ProviderName=$providers} -MaxEvents 350 -ErrorAction Stop)
    $items=@()
    foreach($ev in $records) {
     $items+=@{time_utc=$ev.TimeCreated.ToUniversalTime().ToString('o');provider=[string]$ev.ProviderName;code=[int]$ev.Id;record_id=[long]$ev.RecordId;level=[int]$ev.Level;log=$log}
