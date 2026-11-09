@@ -83,17 +83,24 @@ SourceResult 'gpu' {
 }
 if (-not $SkipProcesses) {
  SourceResult 'process_memory' {
-  # Python workers are possible ComfyUI candidates, NOT an attribution without PID verification.
+  # Attribute only a unique local listening PID, never infer ComfyUI from a Python process name.
+  $owners=@()
+  try {
+   $owners=@(Get-NetTCPConnection -LocalPort $uri.Port -State Listen -ErrorAction Stop |
+     Where-Object { $_.LocalAddress -in @('127.0.0.1','::1','0.0.0.0','::') } |
+     Select-Object -ExpandProperty OwningProcess -Unique)
+  } catch {}
   $items=@(Get-Process -Name python,pythonw -ErrorAction SilentlyContinue | Select-Object -First 20)
   return ,@($items | ForEach-Object {
-   @{pid=$_.Id;process_name=$_.ProcessName;cpu_seconds=$_.CPU;working_set_mib=[math]::Round($_.WorkingSet64/1MB,1);private_memory_mib=[math]::Round($_.PrivateMemorySize64/1MB,1);association='UNCONFIRMED'}
+   $match=if($owners.Count -eq 1 -and [int]$owners[0] -eq $_.Id){'API_LISTENER_PID_MATCH'}else{'UNCONFIRMED'}
+   @{pid=$_.Id;process_name=$_.ProcessName;cpu_seconds=$_.CPU;working_set_mib=[math]::Round($_.WorkingSet64/1MB,1);private_memory_mib=[math]::Round($_.PrivateMemorySize64/1MB,1);association=$match;start_utc=$_.StartTime.ToUniversalTime().ToString('o')}
   })
  }
 } else { $report.sources.process_memory=@{status='DISABLED'} }
 if (-not $SkipStorage) {
  SourceResult 'storage' {
   return ,@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' -ErrorAction Stop | ForEach-Object {
-    @{drive_type='FIXED';total_gib=[math]::Round($_.Size/1GB,1);free_gib=[math]::Round($_.FreeSpace/1GB,1)}
+    @{drive_type='FIXED';volume_alias=[string]$_.DeviceID;total_gib=[math]::Round($_.Size/1GB,1);free_gib=[math]::Round($_.FreeSpace/1GB,1)}
   })
  }
 } else { $report.sources.storage=@{status='DISABLED'} }
