@@ -135,7 +135,7 @@ if (-not $SkipWindows) {
     }
    }
    if($succeeded -eq 0){throw 'WINDOWS_EVENT_ALL_PROVIDER_QUERIES_FAILED'}
-   $items=@($events | Sort-Object -Property TimeCreated -Descending -Unique | Select-Object -First 100 | ForEach-Object {
+   $items=@($events | Sort-Object -Property TimeCreated -Descending | Select-Object -First 100 | ForEach-Object {
     @{time_utc=$_.TimeCreated.ToUniversalTime().ToString('o');provider=[string]$_.ProviderName;code=[int]$_.Id;record_id=[long]$_.RecordId;level=[int]$_.Level;log=$log}
    })
    return ,$items
