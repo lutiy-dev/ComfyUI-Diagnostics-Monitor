@@ -29,8 +29,17 @@ try {
   [CmdletBinding()]
   param([hashtable]$FilterHashtable,[int]$MaxEvents)
   if(-not $FilterHashtable.ContainsKey('ProviderName')){throw 'Provider filter missing from query'}
-  if($FilterHashtable.LogName -eq 'System'){
-   return [pscustomobject]@{TimeCreated=[DateTime]::Now;ProviderName='Display';Id=4101;RecordId=17;Level=2}
+  if($FilterHashtable.ProviderName -is [array]){throw 'STOP: multiple provider names in one query'}
+  if($FilterHashtable.ProviderName -eq 'Display'){
+   $ex=[Exception]::new('No matching synthetic events')
+   $er=[System.Management.Automation.ErrorRecord]::new($ex,'NoMatchingEventsFound',[System.Management.Automation.ErrorCategory]::ObjectNotFound,$null)
+   $PSCmdlet.ThrowTerminatingError($er)
+  }
+  if($FilterHashtable.LogName -eq 'System' -and $FilterHashtable.ProviderName -eq 'Microsoft-Windows-Kernel-Power'){
+   return [pscustomobject]@{TimeCreated=[DateTime]::Now;ProviderName='Microsoft-Windows-Kernel-Power';Id=41;RecordId=17;Level=2}
+  }
+  if($FilterHashtable.LogName -eq 'Application' -and $FilterHashtable.ProviderName -eq 'Windows Error Reporting'){
+   return [pscustomobject]@{TimeCreated=[DateTime]::Now;ProviderName='Windows Error Reporting';Id=1001;RecordId=19;Level=4}
   }
   return
  }
@@ -38,11 +47,10 @@ try {
  & (Join-Path $PSScriptRoot '..\evidence.ps1') -Machine HOME -DataRoot $mockRoot -ComfyLog $log -SkipProcesses -SkipStorage -SkipComfy
  $mockFile=@(Get-ChildItem -LiteralPath (Join-Path $mockRoot 'evidence') -Filter 'evidence_*.json' -File)[0]
  $mock=Get-Content -LiteralPath $mockFile.FullName -Raw|ConvertFrom-Json
- if($mock.sources.events_system.status -ne 'OK' -or $mock.sources.events_system.data[0].code -ne 4101){throw 'Synthetic Display 4101 not captured'}
- if($mock.sources.events_application.status -ne 'EMPTY'){throw 'Empty Application events not classified EMPTY'}
- if($mock.coverage.empty -notcontains 'events_application'){throw 'EMPTY source missing in coverage'}
+ if($mock.sources.events_system.status -ne 'OK' -or $mock.sources.events_system.data[0].code -ne 41){throw 'System event lost when Display has no matching events'}
+ if($mock.sources.events_application.status -ne 'OK' -or $mock.sources.events_application.data[0].code -ne 1001){throw 'Application WER informational event missing'}
  Remove-Item Function:\Get-WinEvent -ErrorAction SilentlyContinue
- Write-Host 'PASS: Windows filtered synthetic 4101 and explicit EMPTY events'
+ Write-Host 'PASS: Windows provider isolation, no-match error and informational WER'
  Write-Host 'PASS: evidence atomic snapshots, privacy, source metadata, localhost guard and offline handling'
 } finally {
  Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
