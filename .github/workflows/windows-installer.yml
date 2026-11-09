@@ -57,7 +57,7 @@ jobs:
       - name: Build ZIP package
         shell: powershell
         run: |
-          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py','docs/DIAGNOSTICS_V06.md','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
+          $files=@('install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md')
           $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
           New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib'),(Join-Path $stage 'docs') | Out-Null
           foreach($f in $files) {
@@ -65,20 +65,20 @@ jobs:
             Copy-Item -LiteralPath $f -Destination (Join-Path $stage $f)
           }
           & .\tools\package-security-gate.ps1 -PackageRoot $stage -OutputManifest 'package-manifest.json'
-          Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.6.zip' -CompressionLevel Optimal
-          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.6.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.6.sha256'
+          Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.7.zip' -CompressionLevel Optimal
+          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.7.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.7.sha256'
           $check=Join-Path $env:RUNNER_TEMP 'VerifyPackagePayload'
-          Expand-Archive -LiteralPath 'ComfyUI-Diagnostics-LAB-v0.6.zip' -DestinationPath $check -ErrorAction Stop
+          Expand-Archive -LiteralPath 'ComfyUI-Diagnostics-LAB-v0.7.zip' -DestinationPath $check -ErrorAction Stop
           foreach ($required in @('ComfyUI-Diagnostics-LAB/install.ps1','ComfyUI-Diagnostics-LAB/dashboard.ps1','ComfyUI-Diagnostics-LAB/configurator.ps1','ComfyUI-Diagnostics-LAB/lib/AppIcon.ps1')) {
             if (-not (Test-Path -LiteralPath (Join-Path $check $required) -PathType Leaf)) { throw "STOP: packaged ZIP missing $required" }
           }
-          if (-not ((Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.6.zip' -Algorithm SHA256).Hash -eq (Get-Content 'ComfyUI-Diagnostics-LAB-v0.6.sha256' -Raw).Trim())) { throw 'STOP: packaged ZIP checksum mismatch' }
+          if (-not ((Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.7.zip' -Algorithm SHA256).Hash -eq (Get-Content 'ComfyUI-Diagnostics-LAB-v0.7.sha256' -Raw).Trim())) { throw 'STOP: packaged ZIP checksum mismatch' }
           Write-Host 'PASS: installable ZIP contents and SHA256 verified'
       - uses: actions/upload-artifact@v4
         with:
           name: ComfyUI-Diagnostics-Windows-LAB
           path: |
-            ComfyUI-Diagnostics-LAB-v0.6.zip
-            ComfyUI-Diagnostics-LAB-v0.6.sha256
+            ComfyUI-Diagnostics-LAB-v0.7.zip
+            ComfyUI-Diagnostics-LAB-v0.7.sha256
             package-manifest.json
           if-no-files-found: error
