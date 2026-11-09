@@ -1,4 +1,4 @@
-# ComfyUI Diagnostics Configurator LAB v0.6 — on-demand safe local evidence capture.
+# ComfyUI Diagnostics Configurator LAB v0.7 — on-demand safe local evidence capture.
 # No privilege elevation, no auto-send, no driver/ComfyUI mutation.
 [CmdletBinding()]
 param(
