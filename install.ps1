@@ -59,7 +59,7 @@ $config=[ordered]@{
 [IO.File]::WriteAllText((Join-Path $InstallRoot 'config.json'),($config|ConvertTo-Json -Depth 3),(New-Object Text.UTF8Encoding($false)))
 $manifest=[ordered]@{
     product='ComfyUI-Diagnostics'
-    version='0.6.0-LAB'
+    version='0.7.0-LAB-CANDIDATE'
     installed_utc=[DateTime]::UtcNow.ToString('o')
     install_root=$InstallRoot
     data_root=$DataRoot
