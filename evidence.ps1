@@ -176,19 +176,29 @@ SourceResult 'environment' {
    }
   }
  }
- # Prefer identity supplied by the selected running ComfyUI instance. Fall back
- # to the existing logfile parser if the endpoint is offline/unsupported.
+ # Prefer system identity from the selected running ComfyUI; retain logfile fallback.
  if (-not $SkipComfy) {
   try {
    $stats=Invoke-RestMethod -Uri ($ComfyUrl.TrimEnd('/')+'/system_stats') -TimeoutSec 3 -ErrorAction Stop
    if ($stats -and $stats.system) {
-    $system=$stats.system
-    if ([string]$system.python_version -match '^(\d+\.\d+(?:\.\d+)?)') { $versions.python=$Matches[1] }
-    if ([string]$system.pytorch_version -match '^(\d+\.\d+(?:\.\d+)?(?:\+cu\d+)?)') { $versions.pytorch=$Matches[1] }
-    if ([string]$system.comfyui_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)') { $versions.comfyui=$Matches[1] }
-    # A PyTorch +cuNNN suffix is the CUDA *build* version, not the driver
-    # version or proof of the runtime CUDA toolkit installation.
-    if ($versions.pytorch -match '\+cu(\d{2,3})
+    $sys=$stats.system
+    if ([string]$sys.python_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)') { $versions.python=$Matches[1] }
+    if ([string]$sys.pytorch_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:\+cu[0-9]+)?)') { $versions.pytorch=$Matches[1] }
+    if ([string]$sys.comfyui_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)') { $versions.comfyui=$Matches[1] }
+    # PyTorch CUDA build is not an NVIDIA driver/toolkit version.
+    if ($versions.pytorch -match '\+cu([0-9]{2,3})$') {
+     $digits=$Matches[1]
+     if ($digits.Length -eq 3) { $versions.cuda=$digits.Substring(0,2)+'.'+$digits.Substring(2) }
+     else { $versions.cuda=$digits.Substring(0,1)+'.'+$digits.Substring(1) }
+    }
+   }
+  } catch {
+   # API unavailable: use existing parsed log values, preserving UNKNOWN.
+  }
+ }
+ return $versions
+}
+if (-not $SkipComfy) {
  SourceResult 'comfy_queue' {
   $result=Invoke-RestMethod -Uri ($ComfyUrl.TrimEnd('/')+'/queue') -TimeoutSec 3 -ErrorAction Stop
   @{running=@($result.queue_running).Count;pending=@($result.queue_pending).Count;endpoint='localhost';port=$uri.Port}
