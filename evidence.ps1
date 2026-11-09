@@ -127,7 +127,7 @@ if (-not $SkipWindows) {
      $events+=@($found)
     } catch {
      $errorId=[string]$_.FullyQualifiedErrorId
-     if($errorId -match 'NoMatchingEventsFound|NoProvidersFound|ProviderNotFound'){
+     if($errorId -match 'NoMatchingEventsFound|NoMatchingProvidersFound|NoProvidersFound|ProviderNotFound'){
       $succeeded++
      } else {
       $script:eventQueryFailures++
