@@ -23,7 +23,7 @@ foreach ($f in $files) {
 $expected=@(
  'install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py',
  'lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py',
- 'docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/DIAGNOSTICS_V06.md'
+ 'docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md'
 )
 if (@(Compare-Object -ReferenceObject @($expected|Sort-Object) -DifferenceObject @($paths|Sort-Object)).Count -gt 0) {
  throw "FAIL: package file inventory differs from allowlist"
