@@ -185,7 +185,7 @@ SourceResult 'environment' {
     if ([string]$sys.python_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)') { $versions.python=$Matches[1] }
     if ([string]$sys.pytorch_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:\+cu[0-9]+)?)') { $versions.pytorch=$Matches[1] }
     if ([string]$sys.comfyui_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)') { $versions.comfyui=$Matches[1] }
-    # PyTorch CUDA build is not an NVIDIA driver/toolkit version.
+    # CUDA build version inferred only from PyTorch +cuNNN (not NVIDIA driver).
     if ($versions.pytorch -match '\+cu([0-9]{2,3})$') {
      $digits=$Matches[1]
      if ($digits.Length -eq 3) { $versions.cuda=$digits.Substring(0,2)+'.'+$digits.Substring(2) }
@@ -239,9 +239,7 @@ if (-not $SkipComfy) {
     if($hits.Count -gt 100) { $hits=@($hits|Select-Object -Last 100) }
    }
   }
-  # Best-effort consistent full-file SHA-256 for an actively written ComfyUI log.
-  # ReadWrite sharing avoids Get-FileHash exclusive-open failures. Detect mutations
-  # before/after hashing instead of presenting a potentially inconsistent hash.
+  # Shared-read full-file SHA-256; keep result UNKNOWN if log changes mid-read.
   $hash='UNKNOWN'
   $hashState='UNAVAILABLE'
   try {
@@ -262,132 +260,6 @@ if (-not $SkipComfy) {
    } else { $hashState='LOG_CHANGED_DURING_READ' }
   } catch { $hashState='UNAVAILABLE' }
   @{status='OK';file_size_bytes=$file.Length;file_modified_utc=$file.LastWriteTimeUtc.ToString('o');file_sha256=$hash;file_hash_status=$hashState;tail_bytes_scanned=$read;tail_lines_scanned=$lineNo;signatures=$hits;raw_text_excluded=$true}
- }
-} else {
- $report.sources.comfy_queue=@{status='DISABLED'}
- $report.sources.comfy_log_evidence=@{status='DISABLED'}
-}
-# Optional full private log archive. This file may contain prompts, paths and tokens.
-# Never enabled by default; no automatic upload or export outside DataRoot.
-if($ArchiveComfyLog -and -not $SkipComfy) {
- $report.sources.private_comfy_log=@{status='UNAVAILABLE';reason='LOG_MISSING_OR_EXCEEDS_QUOTA'}
- if($ComfyLog -and (Test-Path -LiteralPath $ComfyLog -PathType Leaf)) {
-  $rawFile=Get-Item -LiteralPath $ComfyLog
-  $private=Join-Path $DataRoot 'private'
-  $null=New-Item -ItemType Directory -Path $private -Force
-  $existingPrivate=@(Get-ChildItem -LiteralPath $private -File -Filter '*.log' -ErrorAction SilentlyContinue)
-  $privateSum=(@($existingPrivate|Measure-Object Length -Sum)[0].Sum)
-  if($rawFile.Length -le 20MB -and $existingPrivate.Count -lt 20 -and $privateSum -lt 200MB){
-   $filename='comfy_private_'+$Machine+'_'+(Get-Date -Format 'yyyyMMdd_HHmmss')+'_'+[guid]::NewGuid().ToString('N').Substring(0,8)+'.log'
-   $destination=Join-Path $private $filename
-   try {
-    [IO.File]::Copy($ComfyLog,$destination,$false)
-    $report.sources.private_comfy_log=@{
-      status='OK';file_name=$filename;subfolder='private'
-      size_bytes=(Get-Item -LiteralPath $destination).Length
-      sha256=(Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
-      privacy='RAW_CONTAINS_POTENTIAL_SECRETS; LOCAL_ONLY; USER_CONSENT_REQUIRED_BEFORE_SHARING'
-    }
-   } catch {
-    if(Test-Path -LiteralPath $destination){Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue}
-    $report.sources.private_comfy_log=@{status='UNAVAILABLE';reason='LOG_COPY_FAILED'}
-   }
-  }
- }
-}
-$report.coverage=[ordered]@{available=@();missing=@();disabled=@();empty=@();partial=@()}
-foreach($key in @($report.sources.Keys)) {
- $s=$report.sources[$key].status
- if($s -eq 'OK'){$report.coverage.available+= $key}
- elseif($s -eq 'DISABLED'){$report.coverage.disabled+= $key}
- elseif($s -eq 'EMPTY'){$report.coverage.missing+= $key; $report.coverage.empty+= $key}
- elseif($s -eq 'PARTIAL'){$report.coverage.missing+= $key; $report.coverage.partial+= $key}
- else{$report.coverage.missing+=$key}
-}
-if($SelfTest) {
- $report.kind='evidence_selftest'
- $report.sources.events_system=@{status='TEST_FIXTURE';data=@(@{code=4101;provider='Display'})}
- $report.coverage=@{available=@();missing=@();disabled=@();fixture='synthetic Display 4101; no actual GPU failure implied'}
-}
-$folder=Join-Path $DataRoot 'evidence'
-$null=New-Item -ItemType Directory -Path $folder -Force
-$path=Join-Path $folder ("evidence_"+$Machine+"_"+(Get-Date -Format 'yyyyMMdd_HHmmss')+"_"+[guid]::NewGuid().ToString('N').Substring(0,8)+'.json')
-$payload=ConvertTo-Json -InputObject $report -Depth 12
-$bytes=[Text.Encoding]::UTF8.GetBytes($payload)
-if($bytes.Length -gt 3MB) { throw 'STOP: evidence bundle exceeds 3MiB' }
-$existing=@(Get-ChildItem -LiteralPath $folder -Filter 'evidence_*.json' -File -ErrorAction SilentlyContinue)
-if($existing.Count -ge 300 -or (@($existing|Measure-Object -Property Length -Sum)[0].Sum) -gt 100MB) {throw 'STOP: evidence storage quota reached; archive privately before adding files'}
-# Stage in the same directory and move into place only after a complete write.
-$temp=Join-Path $folder ('.pending_'+[guid]::NewGuid().ToString('N')+'.tmp')
-try {
- $stream=[IO.File]::Open($temp,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
- try {
-  $stream.Write($bytes,0,$bytes.Length)
-  $stream.Flush($true)
- } finally { $stream.Dispose() }
- [IO.File]::Move($temp,$path)
-} finally {
- if(Test-Path -LiteralPath $temp){Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue}
-}
-Write-Host "PASS: Evidence snapshot written: $path"
-Write-Host ('AVAILABLE='+$report.coverage.available.Count+' MISSING='+$report.coverage.missing.Count+' DISABLED='+$report.coverage.disabled.Count)
-) {
-     $digits=$Matches[1]
-     if ($digits.Length -eq 3) { $versions.cuda=$digits.Substring(0,2)+'.'+$digits.Substring(2) }
-     else { $versions.cuda=$digits.Substring(0,1)+'.'+$digits.Substring(1) }
-    }
-   }
-  } catch {
-   # Offline API is normal; prior local logfile parsing remains authoritative fallback.
-  }
- }
- return $versions
-}
-if (-not $SkipComfy) {
- SourceResult 'comfy_queue' {
-  $result=Invoke-RestMethod -Uri ($ComfyUrl.TrimEnd('/')+'/queue') -TimeoutSec 3 -ErrorAction Stop
-  @{running=@($result.queue_running).Count;pending=@($result.queue_pending).Count;endpoint='localhost';port=$uri.Port}
- }
- SourceResult 'comfy_log_evidence' {
-  if (-not $ComfyLog -or -not (Test-Path -LiteralPath $ComfyLog -PathType Leaf)) { throw [IO.FileNotFoundException]::new('ComfyUI log absent') }
-  $file=Get-Item -LiteralPath $ComfyLog
-  $hits=@()
-  $lineNo=0
-  # Read a bounded tail while ComfyUI is still appending to the file.
-  $stream=[IO.File]::Open($ComfyLog,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
-  try {
-   $take=[int][Math]::Min($stream.Length,1048576)
-   $offset=$stream.Length-$take
-   [void]$stream.Seek($offset,[IO.SeekOrigin]::Begin)
-   $buffer=New-Object byte[] $take
-   $read=0
-   while($read -lt $take){
-    $n=$stream.Read($buffer,$read,$take-$read)
-    if($n -eq 0){break}
-    $read+=$n
-   }
-  } finally { $stream.Dispose() }
-  $text=[Text.Encoding]::UTF8.GetString($buffer,0,$read)
-  $lines=@($text -split "`r?`n")
-  if($offset -gt 0 -and $lines.Count -gt 0){$lines=@($lines|Select-Object -Skip 1)}
-  $lines=@($lines|Select-Object -Last 1500)
-  foreach($line in $lines) {
-   $lineNo++
-   $code=$null
-   if($line -match '(?i)CUDA.*(error|out of memory)'){$code='CUDA'}
-   elseif($line -match '(?i)out of memory|OOM'){$code='OOM'}
-   elseif($line -match '(?i)HostBuffer|aimdo'){$code='AIMDO'}
-   elseif($line -match '(?i)exception|traceback'){$code='EXCEPTION'}
-   elseif($line -match '(?i)failed to import|module not found'){$code='IMPORT'}
-   if($code) {
-    $hits+=@{tail_line=$lineNo;code=$code}
-    if($hits.Count -gt 100) { $hits=@($hits|Select-Object -Last 100) }
-   }
-  }
-  # Whole-file hashing is best-effort: a changing/locked log must not invalidate parsed error signatures.
-  $hash='UNKNOWN'
-  try {$hash=(Get-FileHash -LiteralPath $ComfyLog -Algorithm SHA256 -ErrorAction Stop).Hash} catch {}
-  @{status='OK';file_size_bytes=$file.Length;file_modified_utc=$file.LastWriteTimeUtc.ToString('o');file_sha256=$hash;tail_bytes_scanned=$read;tail_lines_scanned=$lineNo;signatures=$hits;raw_text_excluded=$true}
  }
 } else {
  $report.sources.comfy_queue=@{status='DISABLED'}
