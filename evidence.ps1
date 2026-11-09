@@ -183,12 +183,12 @@ SourceResult 'environment' {
    $stats=Invoke-RestMethod -Uri ($ComfyUrl.TrimEnd('/')+'/system_stats') -TimeoutSec 3 -ErrorAction Stop
    if ($stats -and $stats.system) {
     $system=$stats.system
-    if ([string]$system.python_version -match '^(\\d+\\.\\d+(?:\\.\\d+)?)') { $versions.python=$Matches[1] }
-    if ([string]$system.pytorch_version -match '^(\\d+\\.\\d+(?:\\.\\d+)?(?:\\+cu\\d+)?)') { $versions.pytorch=$Matches[1] }
-    if ([string]$system.comfyui_version -match '^([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)') { $versions.comfyui=$Matches[1] }
+    if ([string]$system.python_version -match '^(\d+\.\d+(?:\.\d+)?)') { $versions.python=$Matches[1] }
+    if ([string]$system.pytorch_version -match '^(\d+\.\d+(?:\.\d+)?(?:\+cu\d+)?)') { $versions.pytorch=$Matches[1] }
+    if ([string]$system.comfyui_version -match '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)') { $versions.comfyui=$Matches[1] }
     # A PyTorch +cuNNN suffix is the CUDA *build* version, not the driver
     # version or proof of the runtime CUDA toolkit installation.
-    if ($versions.pytorch -match '\\+cu(\\d{2,3})
+    if ($versions.pytorch -match '\+cu(\d{2,3})
  SourceResult 'comfy_queue' {
   $result=Invoke-RestMethod -Uri ($ComfyUrl.TrimEnd('/')+'/queue') -TimeoutSec 3 -ErrorAction Stop
   @{running=@($result.queue_running).Count;pending=@($result.queue_pending).Count;endpoint='localhost';port=$uri.Port}
