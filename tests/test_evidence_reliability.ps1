@@ -30,6 +30,11 @@ try {
   param([hashtable]$FilterHashtable,[int]$MaxEvents)
   if(-not $FilterHashtable.ContainsKey('ProviderName')){throw 'Provider filter missing from query'}
   if($FilterHashtable.ProviderName -is [array]){throw 'STOP: multiple provider names in one query'}
+  if($FilterHashtable.ProviderName -eq 'storport'){
+   $ex=[Exception]::new('No matching synthetic provider')
+   $er=[System.Management.Automation.ErrorRecord]::new($ex,'NoMatchingProvidersFound',[System.Management.Automation.ErrorCategory]::ObjectNotFound,$null)
+   $PSCmdlet.ThrowTerminatingError($er)
+  }
   if($FilterHashtable.ProviderName -eq 'Display'){
    $ex=[Exception]::new('No matching synthetic events')
    $er=[System.Management.Automation.ErrorRecord]::new($ex,'NoMatchingEventsFound',[System.Management.Automation.ErrorCategory]::ObjectNotFound,$null)
@@ -49,6 +54,7 @@ try {
  $mock=Get-Content -LiteralPath $mockFile.FullName -Raw|ConvertFrom-Json
  if($mock.sources.events_system.status -ne 'OK' -or $mock.sources.events_system.data[0].code -ne 41){throw 'System event lost when Display has no matching events'}
  if($mock.sources.events_application.status -ne 'OK' -or $mock.sources.events_application.data[0].code -ne 1001){throw 'Application WER informational event missing'}
+ if($mock.sources.events_system.status -ne 'OK'){throw 'Absent optional storport incorrectly marks System PARTIAL'}
  Remove-Item Function:\Get-WinEvent -ErrorAction SilentlyContinue
  Write-Host 'PASS: Windows provider isolation, no-match error and informational WER'
  Write-Host 'PASS: evidence atomic snapshots, privacy, source metadata, localhost guard and offline handling'
