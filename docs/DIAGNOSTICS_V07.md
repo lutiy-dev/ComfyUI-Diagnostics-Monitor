@@ -1,6 +1,6 @@
 # Evidence Reliability v0.7 — LAB CANDIDATE
 
-**Status:** Windows CI candidate. Not a Production Standard or HOME/WORK hardware acceptance.
+**Status:** VERIFIED LAB CANDIDATE — Windows CI PASS, WORK RTX 4090 on-device smoke and online Evidence PASS (2026-11-10). Latest patch HOME RTX 3070 Ti final runtime and continuous Collector durability NOT TESTED. NOT PRODUCTION.
 
 **Baseline:** HOME-tested v0.6 `f52bc0e9f8d177a421dbd5f7e337e1ee309c44ac` (Draft PR #11).
 **Branch:** `fix/evidence-reliability-v07-20261109` (Draft PR #12).
@@ -29,7 +29,29 @@
 - CI checks for the **current PR head**, not earlier v0.6 run.
 - HOME v0.7 prior candidate: System `EMPTY`, Application `OK`, Queue on port 8190 `OK`, live log signature scan `PARTIAL` due full hash unknown. This is user-observed, **not** a test of the revised hash or API environment code. The HOME final acceptance remains required:
 - HOME acceptance still required: Capture Evidence with Windows and ComfyUI sources enabled; read JSON and verify `sources.events_system`, `events_application`, `reliability`, `comfy_log_evidence`, `coverage`, `collector_version`, while ComfyUI is running.
-- WORK RTX 4090 acceptance and long-running Collector durability remain separate future work.
+- WORK RTX 4090 on-device acceptance: PASS for installation, Windows GUI smoke, offline Evidence, /system_stats and live-log SHA-256 on the latest v0.7 patch. See the verified test matrix below. Long-running Collector durability remains separate future work.
+
+## Runtime verification — 2026-11-10
+
+| Test | HOME RTX 3070 Ti | WORK RTX 4090 |
+| --- | --- | --- |
+| Installed v0.6 baseline, Dashboard/HUD | PASS (prior baseline) | Not evaluated as v0.6 baseline |
+| v0.7 Windows Event provider isolation | PASS: System EMPTY, Application OK | PASS: System EMPTY, Application OK |
+| v0.7 GPU / OS / process / storage sampling | PASS | PASS |
+| v0.7 local ComfyUI queue | PASS on H3 LAB :8190 | PASS on ARCHVIZ_LAB :8188 |
+| New v0.7 /system_stats patch | NOT TESTED on latest patch | PASS: ComfyUI 0.44.0, Python 3.13.12, PyTorch 2.12.1+cu130, CUDA build 13.0 |
+| New shared-read log SHA-256 patch | NOT TESTED on latest patch | PASS: 40,790 tail bytes, 64-hex SHA256, STABLE_BEST_EFFORT |
+| Live log signature scan | PASS on previous v0.7: 7 signatures, hash PARTIAL | PASS on latest v0.7: 2 normalized signatures (not proof of two failures) |
+| Windows install and shortcuts | NOT TESTED for latest package on HOME | PASS on WORK |
+| Multi-hour collector/rotation/sleep-resume | NOT TESTED | NOT TESTED |
+
+WORK Evidence readback on 2026-11-10 recorded: Environment=OK, Queue=OK, Log=OK, HashStatus=STABLE_BEST_EFFORT, SHA256Valid=True, TailBytes=40790, Signatures=2, available=9, missing=1 (System Events EMPTY). The active ComfyUI process was confirmed running from ARCHVIZ_LAB on port 8188; log path was independently inspected and recently updated before capture. A previous comfyui_8188.log was stale and deliberately not selected. No raw log, prompt, machine identity, executable command line, or host user directory is published in the repository.
+
+HOME earlier Evidence capture confirmed System=EMPTY and Application=OK after provider isolation, but before latest /system_stats and shared hashing patch. Do not claim full HOME acceptance of the revised code.
+
+Data quality: 'aimdo=UNKNOWN' may leave Environment PARTIAL on a machine where that optional component was not observed. A missing ComfyUI log or offline API is UNAVAILABLE, not invented data. File hashing is still best-effort against concurrent modifications.
+
+**Release gate:** no Production claim, no merge of Draft PR #11/#12, no automatic replacement of HOME/WORK installation, and no release signed as stable until the owner approves integration and the remaining durability tests. The Windows artifact is a candidate for controlled manual install/rollback.
 
 ## Known limitations / STOP
 
