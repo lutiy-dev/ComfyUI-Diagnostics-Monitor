@@ -26,7 +26,7 @@ $script:buffer=New-Object byte[] 65536
 $script:message=New-Object System.IO.MemoryStream
 $script:skipMessage=$false
 $script:lastAttempt=[datetime]::MinValue
-$script:activeNode='—'
+$script:activeNode='-'
 $script:step=0
 $script:stepTotal=0
 $script:session='Idle'
@@ -70,18 +70,18 @@ function Handle-WsMessage([string]$json) {
     $ev=ConvertFrom-ComfyWsEvent -Json $json
     if ($null -eq $ev) { return }
     switch ($ev.type) {
-        'execution_start' { $script:session='Running'; $script:activeNode='—'; $script:step=0; $script:stepTotal=0 }
+        'execution_start' { $script:session='Running'; $script:activeNode='-'; $script:step=0; $script:stepTotal=0 }
         'executing' {
             if ([string]::IsNullOrEmpty($ev.node)) {
-                $script:activeNode='—'; $script:session='Idle'; $script:step=0; $script:stepTotal=0
+                $script:activeNode='-'; $script:session='Idle'; $script:step=0; $script:stepTotal=0
             } else {
                 $script:activeNode=$ev.node; $script:session='Running'
                 $script:step=0; $script:stepTotal=0
             }
         }
         'progress' { $script:step=$ev.current; $script:stepTotal=$ev.total; $script:session='Running' }
-        'execution_success' { $script:session='Completed'; $script:activeNode='—' }
-        'execution_interrupted' { $script:session='Interrupted'; $script:activeNode='—' }
+        'execution_success' { $script:session='Completed'; $script:activeNode='-' }
+        'execution_interrupted' { $script:session='Interrupted'; $script:activeNode='-' }
         'execution_error' { $script:session='ERROR'; $script:lastEvent='ComfyUI: '+$ev.error_code }
     }
     if ($ev.type -ne 'status' -or $null -ne $ev.queue_remaining) { Save-LiveEvent $ev }
@@ -144,12 +144,41 @@ if(Test-Path -LiteralPath $iconPath -PathType Leaf){
     $script:appIcon=[Drawing.Icon]::new($iconPath)
     $form.Icon=$script:appIcon
 }
-$form.Text="ComfyUI Diagnostics · $Machine · LAB v0.4"
+$uiVersion='0.7.0-LAB-CANDIDATE'
+$uiManifest=Join-Path $PSScriptRoot 'installation.json'
+if(Test-Path -LiteralPath $uiManifest -PathType Leaf){
+    try { $uiVersion=[string]((Get-Content -LiteralPath $uiManifest -Raw | ConvertFrom-Json).version) } catch {}
+}
+$form.Text="ComfyUI Diagnostics | $Machine | $uiVersion"
 $form.Size=[Drawing.Size]::new(960,740)
 $form.MinimumSize=[Drawing.Size]::new(960,740)
-$form.BackColor=[Drawing.Color]::FromArgb(22,26,33)
-$form.ForeColor=[Drawing.Color]::White
+$form.BackColor=[Drawing.Color]::FromArgb(20,24,30)
+$form.ForeColor=[Drawing.Color]::FromArgb(235,240,245)
 $form.Font=[Drawing.Font]::new('Segoe UI',10)
+# UI surface only. GPU cyan and VRAM orange are semantic telemetry colors.
+$uiYellow=[Drawing.Color]::FromArgb(255,212,0)
+$uiPanel=[Drawing.Color]::FromArgb(31,38,47)
+$uiStroke=[Drawing.Color]::FromArgb(71,84,99)
+$uiText=[Drawing.Color]::FromArgb(235,240,245)
+function Set-DiagnosticsButton([Windows.Forms.Button]$control,[switch]$Primary) {
+    $control.UseVisualStyleBackColor=$false
+    $control.FlatStyle=[Windows.Forms.FlatStyle]::Flat
+    $control.FlatAppearance.BorderSize=1
+    $control.FlatAppearance.BorderColor=$uiStroke
+    $control.FlatAppearance.MouseOverBackColor=[Drawing.Color]::FromArgb(59,71,83)
+    $control.FlatAppearance.MouseDownBackColor=[Drawing.Color]::FromArgb(76,88,100)
+    $control.BackColor=$uiPanel
+    $control.ForeColor=$uiText
+    $control.Cursor=[Windows.Forms.Cursors]::Hand
+    $control.Font=[Drawing.Font]::new('Segoe UI',10,[Drawing.FontStyle]::Regular)
+    if($Primary){
+       $control.BackColor=$uiYellow
+       $control.ForeColor=[Drawing.Color]::FromArgb(20,24,30)
+       $control.FlatAppearance.BorderColor=$uiYellow
+       $control.FlatAppearance.MouseOverBackColor=[Drawing.Color]::FromArgb(255,224,70)
+       $control.FlatAppearance.MouseDownBackColor=[Drawing.Color]::FromArgb(223,184,0)
+    }
+}
 $form.StartPosition='CenterScreen'
 $form.TopMost=$true
 $form.KeyPreview=$true
@@ -159,29 +188,30 @@ function New-Label([string]$name,[int]$x,[int]$y,[int]$width,[int]$height,[int]$
     $l.Text=$name; $l.Location=[Drawing.Point]::new($x,$y)
     $l.Size=[Drawing.Size]::new($width,$height)
     $l.Font=[Drawing.Font]::new('Segoe UI',$size)
-    $l.ForeColor=[Drawing.Color]::White
+    $l.ForeColor=$uiText
     $form.Controls.Add($l)
     return $l
 }
-$title=New-Label 'GPU / ComfyUI Diagnostics' 20 12 620 36 18
+$title=New-Label 'GPU / ComfyUI Diagnostics' 20 12 600 36 18
+$title.Font=[Drawing.Font]::new('Segoe UI',17,[Drawing.FontStyle]::Bold)
 $status=New-Label 'Collector: waiting | WebSocket: connecting' 22 55 900 25 10
-$gpu=New-Label 'GPU: —' 22 94 880 26 13
+$gpu=New-Label 'GPU: -' 22 94 880 26 13
 $gpu.ForeColor=[Drawing.Color]::DeepSkyBlue
-$vram=New-Label 'VRAM: —' 22 128 880 26 13
+$vram=New-Label 'VRAM: -' 22 128 880 26 13
 $vram.ForeColor=[Drawing.Color]::Orange
-$temp=New-Label 'Temperature: —  |  Power: —  |  RAM: —' 22 160 900 25 11
-$node=New-Label 'Node: —' 22 200 880 30 13
+$temp=New-Label 'Temperature: -  |  Power: -  |  RAM: -' 22 160 900 25 11
+$node=New-Label 'Node: -' 22 200 880 30 13
 $progress=New-Object Windows.Forms.ProgressBar
 $progress.Location=[Drawing.Point]::new(22,237)
 $progress.Size=[Drawing.Size]::new(790,20)
 $progress.Minimum=0; $progress.Maximum=100
 $form.Controls.Add($progress)
-$steps=New-Label 'Sampler: —' 820 233 120 26 10
+$steps=New-Label 'Sampler: -' 820 233 120 26 10
 
 $chart=New-Object Windows.Forms.DataVisualization.Charting.Chart
 $chart.Location=[Drawing.Point]::new(20,280)
 $chart.Size=[Drawing.Size]::new(905,220)
-$chart.BackColor=[Drawing.Color]::FromArgb(28,34,42)
+$chart.BackColor=$uiPanel
 $area=New-Object Windows.Forms.DataVisualization.Charting.ChartArea 'Telemetry'
 $area.BackColor=$chart.BackColor
 $area.AxisX.LabelStyle.Enabled=$false
@@ -208,7 +238,7 @@ $incident.Size=[Drawing.Size]::new(904,145)
 $incident.Multiline=$true
 $incident.ReadOnly=$true
 $incident.ScrollBars='Vertical'
-$incident.BackColor=[Drawing.Color]::FromArgb(30,36,44)
+$incident.BackColor=$uiPanel
 $incident.ForeColor=[Drawing.Color]::White
 $incident.Font=[Drawing.Font]::new('Consolas',9)
 $form.Controls.Add($incident)
@@ -220,18 +250,14 @@ $hudButton=New-Object System.Windows.Forms.Button
 $hudButton.Text='HUD (F9)'
 $hudButton.Location=[Drawing.Point]::new(784,12)
 $hudButton.Size=[Drawing.Size]::new(136,34)
-$hudButton.FlatStyle=[System.Windows.Forms.FlatStyle]::Flat
-$hudButton.ForeColor=[Drawing.Color]::White
-$hudButton.BackColor=[Drawing.Color]::FromArgb(42,55,68)
+Set-DiagnosticsButton $hudButton
 $form.Controls.Add($hudButton)
 $hudButton.Add_Click({Switch-ToHud})
 $updatesButton=New-Object System.Windows.Forms.Button
 $updatesButton.Text='Check updates'
 $updatesButton.Location=[Drawing.Point]::new(626,12)
 $updatesButton.Size=[Drawing.Size]::new(152,34)
-$updatesButton.FlatStyle=[System.Windows.Forms.FlatStyle]::Flat
-$updatesButton.ForeColor=[Drawing.Color]::White
-$updatesButton.BackColor=[Drawing.Color]::FromArgb(42,55,68)
+Set-DiagnosticsButton $updatesButton
 $form.Controls.Add($updatesButton)
 $updatesButton.Add_Click({
     $updatesButton.Enabled=$false
@@ -301,7 +327,7 @@ function Update-Telemetry {
         $pct=[math]::Min(100,[math]::Max(0,[math]::Round(100*$script:step/$script:stepTotal)))
         $progress.Value=[int]$pct
         $steps.Text="$($script:step) / $($script:stepTotal)"
-    } else { $progress.Value=0; $steps.Text='Sampler: —' }
+    } else { $progress.Value=0; $steps.Text='Sampler: -' }
     foreach ($s in @($chart.Series)) { $s.Points.Clear() }
     foreach ($sample in $valid) {
         if ($sample.gpu.status -ne 'OK' -or $sample.gpu.gpus.Count -eq 0) { continue }
