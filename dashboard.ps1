@@ -450,11 +450,28 @@ function Update-Incidents {
     }
     $incident.Text=(($lines | Sort-Object when -Descending | Select-Object -First 22 | ForEach-Object { $_.display }) -join [Environment]::NewLine)
 }
+$script:updateJob=$null
 $timer=New-Object Windows.Forms.Timer
 $timer.Interval=1000
 $timer.Add_Tick({
     try {
         Tick-WebSocket
+        if ($null -ne $script:updateJob -and $script:updateJob.State -in @('Completed','Failed','Stopped')) {
+            try {
+                if ($script:updateJob.State -eq 'Completed') {
+                    $check=Receive-Job -Job $script:updateJob -ErrorAction SilentlyContinue
+                    if ($null -ne $check -and $check.status -eq 'UPDATE_AVAILABLE') {
+                        $updatesButton.Text='Update available'
+                        $updatesButton.BackColor=$uiYellow
+                        $updatesButton.ForeColor=[Drawing.Color]::FromArgb(20,24,30)
+                        $updatesButton.FlatAppearance.BorderColor=$uiYellow
+                    }
+                }
+            } finally {
+                Remove-Job -Job $script:updateJob -Force -ErrorAction SilentlyContinue
+                $script:updateJob=$null
+            }
+        }
         $script:ticks++
         if ($script:ticks % 3 -eq 0) { Update-Telemetry; Update-Incidents }
         if ($script:hudVisible) { $script:hud.Invalidate() }
@@ -477,6 +494,10 @@ $script:tray.Add_DoubleClick({ Switch-ToFullDashboard })
 $form.Add_FormClosing({
     $script:closing=$true
     $timer.Stop()
+    if ($null -ne $script:updateJob) {
+        Remove-Job -Job $script:updateJob -Force -ErrorAction SilentlyContinue
+        $script:updateJob=$null
+    }
     $script:tray.Visible=$false
     $script:tray.Dispose()
     $trayMenu.Dispose()
@@ -525,6 +546,17 @@ if ($HudSelfTest) {
         }
     })
     $script:hudTestTimer.Start()
+}
+# On startup, query release metadata in a background PowerShell job once.
+# Never block WinForms, download code or install from this automatic check.
+if (-not $HudSelfTest) {
+    try {
+        $script:updateJob=Start-Job -ScriptBlock {
+            param($updatesPath,$currentVersion)
+            . $updatesPath
+            Get-DiagnosticsReleaseStatus -CurrentVersion $currentVersion
+        } -ArgumentList (Join-Path $PSScriptRoot 'lib\Updates.ps1'),$uiVersion -ErrorAction Stop
+    } catch { $script:updateJob=$null }
 }
 $timer.Start()
 # ApplicationContext preserves process lifetime while Dashboard is hidden.
