@@ -1,0 +1,161 @@
+name: Windows LAB installer and portable package
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-and-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell syntax validation
+        shell: powershell
+        run: |
+          foreach ($path in @('install.ps1','uninstall.ps1','dashboard.ps1','collector.ps1','evidence.ps1','configurator.ps1','lib/Hud.ps1','lib/ComfyWs.ps1','lib/Updates.ps1','lib/AppIcon.ps1')) {
+            $tokens=$null; $errors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
+            if ($errors.Count -ne 0) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+            Write-Host "PASS parse $path"
+          }
+      - name: Non-admin install, dashboard initialization, removal and data preservation
+        shell: powershell
+        run: |
+          $inst=Join-Path $env:RUNNER_TEMP 'MyApp'
+          $data=Join-Path $env:RUNNER_TEMP 'Diagnostics'
+          & .\install.ps1 -Machine HOME -InstallRoot $inst -DataRoot $data -NoShortcuts
+          if (-not (Test-Path (Join-Path $inst 'installation.json'))) { throw 'Missing install manifest' }
+          'KEEP_MY_DATA' | Set-Content -LiteralPath (Join-Path $data 'preserve.test')
+          if (-not (Test-Path (Join-Path $inst 'app.ico'))) { throw 'STOP: installed application icon missing' }
+          $icon=[Drawing.Icon]::new((Join-Path $inst 'app.ico'))
+          $icon.Dispose()
+          Write-Host 'PASS: installed icon validated by .NET'
+          & (Join-Path $inst 'launch.ps1') -Mode Dashboard -SelfTest
+          & (Join-Path $inst 'launch.ps1') -Mode Collector -SelfTest
+          & (Join-Path $inst 'launch.ps1') -Mode Configurator -SelfTest
+          & (Join-Path $inst 'configurator.ps1') -Machine HOME -DataRoot $data -ComfyLog '' -SelfTest -CaptureSelfTest
+          & (Join-Path $inst 'launch.ps1') -Mode Evidence -SelfTest
+          if (-not (Test-Path (Join-Path $data 'evidence'))) { throw 'Evidence folder not created' }
+          # User-opt-in raw log case: private raw file retained, normalized evidence must omit raw secret.
+          $fake=Join-Path $env:RUNNER_TEMP 'comfyui_synthetic.log'
+          'Python version: 3.12.1' | Set-Content -LiteralPath $fake
+          'CUDA error: SYNTHETIC_PRIVATE_PROMPT_NEVER_EXPORT' | Add-Content -LiteralPath $fake
+          & (Join-Path $inst 'evidence.ps1') -Machine HOME -DataRoot $data -ComfyLog $fake -ArchiveComfyLog -SkipWindows -SkipProcesses -SkipStorage
+          $raw=@(Get-ChildItem (Join-Path $data 'private') -Filter '*.log')
+          if ($raw.Count -ne 1) { throw 'Private raw log not archived under explicit consent' }
+          $records=@(Get-ChildItem (Join-Path $data 'evidence') -Filter '*.json' | Sort-Object LastWriteTime -Descending)
+          $latest=Get-Content -LiteralPath $records[0].FullName -Raw
+          if ($latest -match 'SYNTHETIC_PRIVATE_PROMPT_NEVER_EXPORT') { throw 'Privacy failure: raw log text leaked into normalized evidence' }
+          $parsed=$latest | ConvertFrom-Json
+          if ($parsed.sources.private_comfy_log.status -ne 'OK') { throw 'Raw log archive status not recorded' }
+          Write-Host 'PASS: private opt-in log archive and normalized snapshot redaction'
+          & .\uninstall.ps1 -InstallRoot $inst -NoShortcuts
+          if (-not (Test-Path (Join-Path $data 'preserve.test'))) { throw 'Uninstall deleted diagnostic data!' }
+          if (Test-Path (Join-Path $inst 'installation.json')) { throw 'Installation manifest remains after uninstall' }
+          if (Test-Path (Join-Path $inst 'app.ico')) { throw 'Uninstall left installed icon' }
+          Write-Host 'PASS: installer, WinForms, uninstaller and retained data'
+      - name: Build ZIP package
+        shell: powershell
+        run: |
+          $files=@('Install-or-Update.bat','install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/CPU_RAM_3DSMAX.md','docs/UI_LAYOUT_PASS.md','docs/UI_CONSISTENCY_FIX.md','docs/LEGEND_LIVE_PERCENTAGES.md')
+          $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib'),(Join-Path $stage 'docs') | Out-Null
+          foreach($f in $files) {
+            if (-not (Test-Path -LiteralPath $f)) { throw "Missing package input: $f" }
+            Copy-Item -LiteralPath $f -Destination (Join-Path $stage $f)
+          }
+          & .\tools\package-security-gate.ps1 -PackageRoot $stage -OutputManifest 'package-manifest.json'
+          Compress-Archive -LiteralPath $stage -DestinationPath 'ComfyUI-Diagnostics-LAB-v0.8.zip' -CompressionLevel Optimal
+          (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.8.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.8.sha256'
+          $check=Join-Path $env:RUNNER_TEMP 'VerifyPackagePayload'
+          Expand-Archive -LiteralPath 'ComfyUI-Diagnostics-LAB-v0.8.zip' -DestinationPath $check -ErrorAction Stop
+          foreach ($required in @('ComfyUI-Diagnostics-LAB/install.ps1','ComfyUI-Diagnostics-LAB/dashboard.ps1','ComfyUI-Diagnostics-LAB/configurator.ps1','ComfyUI-Diagnostics-LAB/lib/AppIcon.ps1','ComfyUI-Diagnostics-LAB/Install-or-Update.bat')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $check $required) -PathType Leaf)) { throw "STOP: packaged ZIP missing $required" }
+          }
+          if (-not ((Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.8.zip' -Algorithm SHA256).Hash -eq (Get-Content 'ComfyUI-Diagnostics-LAB-v0.8.sha256' -Raw).Trim())) { throw 'STOP: packaged ZIP checksum mismatch' }
+          Write-Host 'PASS: installable ZIP contents and SHA256 verified'
+      - name: Compile per-user GUI EXE (Inno Setup)
+        shell: powershell
+        run: |
+          $compiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $compiler)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'STOP: Inno Setup installation failed' }
+          }
+          if (-not (Test-Path -LiteralPath $compiler)) { throw 'STOP: Inno Setup compiler unavailable' }
+          $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
+          $out=Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          & $compiler ('/DSourceRoot='+$stage) ('/O'+$out) 'tools\windows-setup.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'STOP: EXE compile failed' }
+          $exe=Join-Path $out 'ComfyUI-Diagnostics-Setup-v0.8-LAB.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'STOP: missing EXE installer' }
+          (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash | Out-File -Encoding ascii (Join-Path $out 'ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256')
+          Write-Host 'PASS: unsigned Windows GUI EXE created with SHA256'
+      - name: GUI EXE silent installation and data-preservation test
+        shell: powershell
+        run: |
+          $exe=Join-Path $PWD 'dist\ComfyUI-Diagnostics-Setup-v0.8-LAB.exe'
+          $r=Start-Process -FilePath $exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+          if ($r.ExitCode -ne 0) { throw "STOP: EXE returned $($r.ExitCode)" }
+          $installed=Join-Path $env:LOCALAPPDATA 'Programs\ComfyUI-Diagnostics'
+          $marker=Join-Path $installed 'installation.json'
+          if (-not (Test-Path -LiteralPath $marker)) { throw 'STOP: EXE did not install program' }
+          $info=Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json
+          if ($info.machine -ne 'HOME' -or $info.version -ne '0.8.0-LAB-CANDIDATE') { throw 'STOP: EXE installed wrong identity/version' }
+          $data=Join-Path $env:LOCALAPPDATA 'ComfyUI-Diagnostics'
+          'PRESERVE_FROM_EXE_TEST' | Out-File -LiteralPath (Join-Path $data 'preserve-exe.test')
+          & .\uninstall.ps1
+          if (-not (Test-Path -LiteralPath (Join-Path $data 'preserve-exe.test'))) { throw 'STOP: EXE installation uninstaller deleted data' }
+          Write-Host 'PASS: EXE installed HOME profile and kept diagnostic data on uninstall'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ComfyUI-Diagnostics-Windows-LAB
+          path: |
+            ComfyUI-Diagnostics-LAB-v0.8.zip
+            ComfyUI-Diagnostics-LAB-v0.8.sha256
+            package-manifest.json
+            dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe
+            dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256
+          if-no-files-found: error
+
+  publish-lab-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ComfyUI-Diagnostics-Windows-LAB
+          path: release-assets
+      - name: Verify hashes and publish v0.8 LAB prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          test -f dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe
+          test -f ComfyUI-Diagnostics-LAB-v0.8.zip
+          echo "$(tr -d '\r\n' < dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256)  dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe" | sha256sum -c -
+          echo "$(tr -d '\r\n' < ComfyUI-Diagnostics-LAB-v0.8.sha256)  ComfyUI-Diagnostics-LAB-v0.8.zip" | sha256sum -c -
+          cd ..
+          if gh release view v0.8.0-LAB --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'LAB prerelease exists: preserving published assets; no overwrite'
+            exit 0
+          fi
+          gh release create v0.8.0-LAB \
+            release-assets/dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe \
+            release-assets/dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256 \
+            release-assets/ComfyUI-Diagnostics-LAB-v0.8.zip \
+            release-assets/ComfyUI-Diagnostics-LAB-v0.8.sha256 \
+            release-assets/package-manifest.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title 'ComfyUI Diagnostics Monitor v0.8.0 LAB CANDIDATE' \
+            --notes-file docs/RELEASE_V08_LAB.md

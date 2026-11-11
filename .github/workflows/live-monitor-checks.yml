@@ -1,0 +1,41 @@
+name: Live monitor static checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  windows-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell source
+        shell: powershell
+        run: |
+          foreach ($path in @('collector.ps1','dashboard.ps1','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','configurator.ps1','evidence.ps1','tests/test_live.ps1','tests/test_evidence_reliability.ps1')) {
+            $tokens = $null
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
+            if ($errors.Count -gt 0) { $errors | Out-String | Write-Error; exit 1 }
+            Write-Host "PASS parse $path"
+          }
+      - name: Test WebSocket event parsing
+        shell: powershell
+        run: .\tests\test_live.ps1
+      - name: Offline update checker unit tests
+        shell: powershell
+        run: .\tests\test_updates.ps1
+      - name: Windows Forms initialization smoke test
+        shell: powershell
+        run: .\dashboard.ps1 -SelfTest -DataDir $env:RUNNER_TEMP
+      - name: Windows HUD show/hide/restore regression
+        shell: powershell
+        timeout-minutes: 2
+        run: .\dashboard.ps1 -HudSelfTest -DataDir $env:RUNNER_TEMP
+      - name: Evidence reliability Windows regression
+        shell: powershell
+        run: .\\tests\\test_evidence_reliability.ps1
+      - name: Test SQLite importer
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
