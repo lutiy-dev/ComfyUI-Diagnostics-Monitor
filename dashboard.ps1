@@ -398,11 +398,12 @@ function Update-Telemetry {
     } else { $progress.Value=0; $steps.Text='Sampler: -' }
     foreach ($s in @($chart.Series)) { $s.Points.Clear() }
     foreach ($sample in $valid) {
-        if ($sample.gpu.status -ne 'OK' -or $sample.gpu.gpus.Count -eq 0) { continue }
-        $g=$sample.gpu.gpus[0]
-        $load=To-Metric $g.util_pct; $used=To-Metric $g.vram_used_mib; $total=To-Metric $g.vram_total_mib
-        if ($null -ne $load) { [void]$chart.Series['GPU %'].Points.AddY($load) }
-        if ($null -ne $used -and $total -gt 0) { [void]$chart.Series['VRAM %'].Points.AddY((100*$used/$total)) }
+        if ($null -ne $sample.gpu -and $sample.gpu.status -eq 'OK' -and @($sample.gpu.gpus).Count -gt 0) {
+            $g=$sample.gpu.gpus[0]
+            $load=To-Metric $g.util_pct; $used=To-Metric $g.vram_used_mib; $total=To-Metric $g.vram_total_mib
+            if ($null -ne $load) { [void]$chart.Series['GPU %'].Points.AddY($load) }
+            if ($null -ne $used -and $total -gt 0) { [void]$chart.Series['VRAM %'].Points.AddY((100*$used/$total)) }
+        }
         if ($null -ne $sample.cpu -and $sample.cpu.status -eq 'OK') {
             $cpuValue=To-Metric $sample.cpu.util_pct
             if ($null -ne $cpuValue) { [void]$chart.Series['CPU %'].Points.AddY($cpuValue) }
