@@ -1,59 +1,40 @@
-# Windows LAB Installer v0.5 — non-admin ZIP package
+# Windows Installer — v0.8 LAB CANDIDATE
 
-**Status:** LAB candidate; no EXE/MSI yet. This is a user-level PowerShell installer inside a versioned ZIP, not a production signed installer.
+**Status:** unsigned per-user GUI EXE + inspectable BAT/PowerShell fallback. NOT PRODUCTION.
 
-## What it creates
+## Supported platforms
+Windows 10/11 x64; Windows PowerShell 5.1, .NET WinForms. NVIDIA SMI is optional but required for GPU metrics. No administrator privileges.
 
-- App: `%LOCALAPPDATA%\Programs\ComfyUI-Diagnostics`
-- Private data: `%LOCALAPPDATA%\ComfyUI-Diagnostics` (existing v0.3 HOME data reused, never deleted)
-- Optional Start Menu shortcuts: `ComfyUI Diagnostics LAB\Dashboard` and `Collector`
-- Program manifest/config: `installation.json`, `config.json`; machine HOME/WORK and ComfyUI log path configured locally.
+## Choose one install method
 
-It does not install Python, change drivers, alter ComfyUI, start a Windows service, schedule monitoring, add firewall rules, upload data or change registry TDR. Requires Windows PowerShell 5.1, Windows Forms/.NET, NVIDIA SMI for GPU metrics.
+**Recommended:** run `ComfyUI-Diagnostics-Setup-v0.8-LAB.exe` by double click. Select HOME (RTX 3070 Ti) or WORK (RTX 4090) in the wizard. The EXE is compiled from the auditable `tools/windows-setup.iss` by the Windows CI job and delegates installation to the repository's `install.ps1`. It is **unsigned**; validate GitHub origin, SHA256 and Windows security verdict before running.
 
-## Install on HOME
+**Fallback:** extract `ComfyUI-Diagnostics-LAB-v0.8.zip`. Open the *inner* `ComfyUI-Diagnostics-LAB` folder and double click `Install-or-Update.bat`; select HOME or WORK. It asks for confirmation, then invokes the existing PowerShell installer with `-Upgrade`. Do not launch the BAT from an untrusted directory.
 
-From the extracted ZIP directory containing `install.ps1`:
+**Manual CLI** (troubleshooting only):
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Machine HOME -ComfyLog "Q:\AI_ArchViz\ComfyUI_windows_portable\ComfyUI\user\comfyui.log"
+.\install.ps1 -Machine HOME -Upgrade
 ```
 
-The installer refuses overwrite except with explicit `-Upgrade`. Program files are copied into the app folder. The old local diagnostic folder is preserved.
+## Updating without losing evidence
 
-For WORK use `-Machine WORK` and that machine's known ComfyUI log path; don't invent its path.
+Close Dashboard, Configurator and Collector before running either installer. The installed program is updated in `%LOCALAPPDATA%\Programs\ComfyUI-Diagnostics`. Diagnostic JSON and JSONL remain in `%LOCALAPPDATA%\ComfyUI-Diagnostics` and are preserved by upgrades and the provided uninstaller. Existing ComfyUI log configuration is retained unless explicitly overridden. Current v0.8 installer is not transactional; keep the previous validated ZIP/EXE as the rollback point and re-run it if a new setup fails. **Do not upgrade during an active capture or a 3ds Max render being diagnosed.**
 
-## Start
+Start Menu: `ComfyUI Diagnostics LAB` → Dashboard, Collector, Configurator. No auto-start, Windows service, forced process kill, GPU reset, registry adjustment or driver change.
 
-Start Menu → ComfyUI Diagnostics LAB → Collector (when you want recording), then Dashboard. The collector is a blocking process; stop with Ctrl+C. The dashboard also works without collector but displays historical STALE data.
+## Logs and reporting
 
-The collector has to be running to record **new GPU/VRAM samples**. Events Windows already captured may later be queried even if collector was off. ComfyUI's own log is written by ComfyUI, not by this installer. Current collector logs are normalized, not a full transcript of all errors. Therefore this is NOT YET a complete diagnostic forensic archive.
+Use **Open Logs Folder** in Dashboard or Configurator to open `%LOCALAPPDATA%\ComfyUI-Diagnostics`. `evidence\` contains manually generated JSON. `telemetry_HOME_*.jsonl`, `events_HOME_*.jsonl` and `live_HOME_*.jsonl` (or WORK aliases) record samples and events while their respective sources are running.
 
-## Share with ChatGPT
+No files are uploaded automatically; inspect and redact filenames, paths and client context before sharing.
 
-The local folder is private Windows data; opening a folder via `Open project in ChatGPT` needs a real access test before claiming ChatGPT can read every file or monitor changes. Without verified access, select a small, reviewed log/export and attach it manually to a chat. **Do not upload private logs to the public GitHub repository.**
+## Update safety
 
-The later opt-in incident exporter must redact secrets, private client file paths and prompts, and will only copy chosen time windows. Folder access cannot be guaranteed by this installer.
+The Dashboard checks metadata from the official GitHub releases API automatically once per app launch, without downloading or installing programs. If a newer published version is found, the update button changes to **Update available**. Clicking it opens the official release page only after confirmation. Automatic install is disabled pending Authenticode signing, robust code rollback and running Collector shutdown. Hashes in release assets provide integrity, not publisher authenticity.
 
-## Uninstall
+## CI acceptance and STOP
 
-Stop running collector and dashboard, then:
+The Windows Actions workflow must pass: PowerShell source parsing; WinForms/HUD/Evidence tests; ZIP SHA256/allowlist; non-admin install and uninstall data retention; Inno Setup compilation; EXE silent-install smoke and data preservation. Actual HOME/WORK Defender/SmartScreen reputation and long-running multi-hour Collector validation are still required.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1
-```
-
-Uninstall removes only known installed program files and its own shortcuts, **not** diagnostic data. Backups are optional: existing data should be backed up before destructive manual operations. If a custom InstallRoot was used, pass the same `-InstallRoot` to uninstall.
-
-## Tests and limitations
-
-Windows CI:
-- PowerShell syntax of installer, dashboard, collector and HUD;
-- install into isolated temporary folder;
-- WinForms initialization smoke test;
-- uninstall and assert diagnostic data preservation;
-- ZIP + SHA-256 uploaded as CI artifacts.
-
-Real HOME GPU and UI, Start Menu shortcuts, installation while previous collector is running, Unicode custom paths, Windows Defender reputation, and WORK hardware are **NOT TESTED** until manually checked. No signed EXE/MSI, auto-update, background service, or automatic repair is supplied. **Do not install into a folder containing user files.**
-
-STOP for accidental data deletion, incorrect path, conflicts with running programs or Windows security warnings. No forced restart or driver changes.
+STOP on any unexpected security warning, unknown publisher behavior, failing checksum, missing installed shortcut, overwritten diagnostic data, installation into a directory with unmanaged user files, or an attempted unsigned unattended update.
