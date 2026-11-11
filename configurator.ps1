@@ -33,6 +33,7 @@ $window.Text="ComfyUI Diagnostics Configurator | $Machine | $uiVersion"
 $window.Size=[Drawing.Size]::new(720,690)
 $window.MinimumSize=$window.Size
 $window.MaximumSize=$window.Size
+$window.AutoScaleMode=[Windows.Forms.AutoScaleMode]::Font
 $window.StartPosition='CenterScreen'
 $window.Font=[Drawing.Font]::new('Segoe UI',10)
 $window.BackColor=[Drawing.Color]::FromArgb(20,24,30)
@@ -65,6 +66,7 @@ $window.TopMost=$true
 function LabelText([string]$s,[int]$x,[int]$y,[int]$w,[int]$h) {
  $o=New-Object Windows.Forms.Label
  $o.Text=$s;$o.Location=[Drawing.Point]::new($x,$y);$o.Size=[Drawing.Size]::new($w,$h)
+ $o.AutoEllipsis=$true
  $window.Controls.Add($o);return $o
 }
 $heading=LabelText 'Diagnostics Evidence Center' 20 18 620 30
@@ -85,6 +87,7 @@ $logBox.Text=$ComfyLog
 $logBox.BackColor=$uiPanel
 $logBox.ForeColor=$uiText
 $logBox.BorderStyle=[Windows.Forms.BorderStyle]::FixedSingle
+$logBox.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $window.Controls.Add($logBox)
 $null=LabelText 'Sources included in snapshot:' 21 235 500 26
 $checks=[ordered]@{}
@@ -101,6 +104,7 @@ foreach($item in $items) {
  $cb.Size=[Drawing.Size]::new(640,28)
  $cb.BackColor=$window.BackColor
  $cb.ForeColor=$uiText
+ $cb.FlatStyle=[Windows.Forms.FlatStyle]::Standard
  $window.Controls.Add($cb);$checks[$item[1]]=$cb
 }
 $rawLog=New-Object Windows.Forms.CheckBox
@@ -124,6 +128,7 @@ Set-DiagnosticsButton $open
 $window.Controls.Add($open)
 $status=LabelText 'Ready - all captures are manually triggered.' 21 515 645 72
 $status.ForeColor=$uiMuted
+$status.Anchor=[Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
 $open.Add_Click({
  $path=Join-Path $DataRoot 'evidence'
  $null=New-Item -ItemType Directory -Path $path -Force
@@ -155,10 +160,10 @@ $button.Add_Click({
   $latest=$new|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 1
   $record=Get-Content -LiteralPath $latest.FullName -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop
   if($record.kind -ne 'evidence_snapshot' -or $record.schema -ne 2){throw 'Created JSON failed evidence schema verification'}
-  $status.ForeColor=[Drawing.Color]::LightGreen
+  $status.ForeColor=[Drawing.Color]::FromArgb(139,218,173)
   $status.Text="PASS: $($latest.Name) - $($latest.Length) bytes"
  } catch {
-  $status.ForeColor=[Drawing.Color]::OrangeRed
+  $status.ForeColor=[Drawing.Color]::FromArgb(255,177,92)
   $localMessage=$_.Exception.Message
   if($localMessage.Length -gt 350){$localMessage=$localMessage.Substring(0,350)+'...'}
   $status.Text="FAIL: $localMessage"
