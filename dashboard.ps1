@@ -210,15 +210,18 @@ $vram.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]
 $temp=New-Label 'Temperature: -  |  Power: -  |  RAM: -' 22 160 900 25 11
 $temp.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $temp.ForeColor=$uiMuted
-$node=New-Label 'Node: -' 22 200 880 30 13
+$system=New-Label 'CPU: --  |  System RAM: --  |  3ds Max RAM: --' 22 187 900 24 10
+$system.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+$system.ForeColor=$uiMuted
+$node=New-Label 'Node: -' 22 212 880 28 12
 $node.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $progress=New-Object Windows.Forms.ProgressBar
-$progress.Location=[Drawing.Point]::new(22,237)
+$progress.Location=[Drawing.Point]::new(22,243)
 $progress.Size=[Drawing.Size]::new(790,20)
 $progress.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $progress.Minimum=0; $progress.Maximum=100
 $form.Controls.Add($progress)
-$steps=New-Label 'Sampler: -' 820 233 120 26 10
+$steps=New-Label 'Sampler: -' 820 239 120 26 10
 $steps.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
 
 $chart=New-Object Windows.Forms.DataVisualization.Charting.Chart
@@ -236,7 +239,7 @@ $area.AxisY.MajorGrid.LineColor=[Drawing.Color]::FromArgb(55,65,75)
 $area.AxisY.LineColor=$uiStroke
 $area.AxisX.LineColor=$uiStroke
 $chart.ChartAreas.Add($area)
-foreach ($spec in @(@('GPU %','DeepSkyBlue'),@('VRAM %','Orange'))) {
+foreach ($spec in @(@('GPU %','DeepSkyBlue'),@('VRAM %','Orange'),@('CPU %','LightGreen'),@('RAM %','MediumPurple'))) {
     $series=New-Object Windows.Forms.DataVisualization.Charting.Series $spec[0]
     $series.ChartType='Line'; $series.BorderWidth=2
     $series.Color=[Drawing.Color]::FromName($spec[1])
@@ -253,6 +256,8 @@ $legend.Font=[Drawing.Font]::new('Consolas',9)
 $chart.Legends.Add($legend)
 $chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %','--')
 $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
+$chart.Series['CPU %'].LegendText=('{0,-7}{1,6}' -f 'CPU %','--')
+$chart.Series['RAM %'].LegendText=('{0,-7}{1,6}' -f 'RAM %','--')
 $form.Controls.Add($chart)
 $incidentTitle=New-Label 'Incident timeline (normalized events, no prompts)' 22 510 800 25 11
 $incidentTitle.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
@@ -343,8 +348,9 @@ function Update-Telemetry {
     $ws=$script:wsState
     $status.Text='Collector: '+$(if ($stale) { 'STALE' } else { 'ACTIVE' })+' | ComfyUI API: '+$current.comfy.status+' | WebSocket: '+$ws+' | '+$script:session
     $status.ForeColor=if($stale){$uiWarn}else{$uiGood}
-    $chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %','--')
-    $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
+    foreach ($key in @('GPU %','VRAM %','CPU %','RAM %')) {
+        $chart.Series[$key].LegendText=('{0,-7}{1,6}' -f $key,'--')
+    }
     if ($current.gpu.status -eq 'OK' -and $current.gpu.gpus.Count -gt 0) {
         $g=$current.gpu.gpus[0]
         $gpuLoad=To-Metric $g.util_pct
@@ -360,6 +366,30 @@ function Update-Telemetry {
         }
         $temp.Text='Temperature: '+$g.temperature_c+' °C  |  Power: '+$g.power_w+' W  |  RAM: '+$current.ram.used_mib+' / '+$current.ram.total_mib+' MiB'
     }
+    $cpuDisplay='--'
+    if ($null -ne $current.cpu -and $current.cpu.status -eq 'OK') {
+        $cpuLoad=To-Metric $current.cpu.util_pct
+        if ($null -ne $cpuLoad) {
+            $cpuDisplay=('{0:0.0}%' -f $cpuLoad)
+            $chart.Series['CPU %'].LegendText=('{0,-7}{1,6}' -f 'CPU %', $cpuDisplay)
+        }
+    }
+    $ramDisplay='--'
+    $ramUsed=To-Metric $current.ram.used_mib
+    $ramTotal=To-Metric $current.ram.total_mib
+    if ($null -ne $ramUsed -and $null -ne $ramTotal -and $ramTotal -gt 0) {
+        $ramPercent=100*$ramUsed/$ramTotal
+        $ramDisplay=('{0:0.0} / {1:0.0} GiB' -f ($ramUsed/1024),($ramTotal/1024))
+        $chart.Series['RAM %'].LegendText=('{0,-7}{1,6}' -f 'RAM %',('{0:0.0}%' -f $ramPercent))
+    }
+    $maxDisplay='NOT RUNNING'
+    if ($null -ne $current.max_memory) {
+        if ($current.max_memory.status -eq 'OK') {
+            $maxSet=To-Metric $current.max_memory.working_set_mib
+            if ($null -ne $maxSet) { $maxDisplay=('{0:0.0} GiB' -f ($maxSet/1024)) }
+        } elseif ($current.max_memory.status -eq 'UNAVAILABLE') { $maxDisplay='UNAVAILABLE' }
+    } else { $maxDisplay='NO DATA' }
+    $system.Text='CPU: '+$cpuDisplay+'  |  System RAM: '+$ramDisplay+'  |  3ds Max RAM: '+$maxDisplay
     $node.Text='Active node: '+$script:activeNode
     if ($script:stepTotal -gt 0) {
         $pct=[math]::Min(100,[math]::Max(0,[math]::Round(100*$script:step/$script:stepTotal)))
@@ -373,6 +403,15 @@ function Update-Telemetry {
         $load=To-Metric $g.util_pct; $used=To-Metric $g.vram_used_mib; $total=To-Metric $g.vram_total_mib
         if ($null -ne $load) { [void]$chart.Series['GPU %'].Points.AddY($load) }
         if ($null -ne $used -and $total -gt 0) { [void]$chart.Series['VRAM %'].Points.AddY((100*$used/$total)) }
+        if ($null -ne $sample.cpu -and $sample.cpu.status -eq 'OK') {
+            $cpuValue=To-Metric $sample.cpu.util_pct
+            if ($null -ne $cpuValue) { [void]$chart.Series['CPU %'].Points.AddY($cpuValue) }
+        }
+        $ramValue=To-Metric $sample.ram.used_mib
+        $ramCapacity=To-Metric $sample.ram.total_mib
+        if ($null -ne $ramValue -and $null -ne $ramCapacity -and $ramCapacity -gt 0) {
+            [void]$chart.Series['RAM %'].Points.AddY((100*$ramValue/$ramCapacity))
+        }
     }
 }
 function Update-Incidents {
