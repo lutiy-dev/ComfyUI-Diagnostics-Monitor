@@ -229,7 +229,11 @@ foreach ($spec in @(@('GPU %','DeepSkyBlue'),@('VRAM %','Orange'))) {
 $legend=New-Object Windows.Forms.DataVisualization.Charting.Legend
 $legend.ForeColor=[Drawing.Color]::White
 $legend.BackColor=$chart.BackColor
+# Monospaced right-aligned numeric column, preserving built-in GPU/VRAM colors.
+$legend.Font=[Drawing.Font]::new('Consolas',9)
 $chart.Legends.Add($legend)
+$chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %','--')
+$chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
 $form.Controls.Add($chart)
 $null=New-Label 'Incident timeline (normalized events, no prompts)' 22 510 800 25 11
 $incident=New-Object Windows.Forms.TextBox
@@ -314,12 +318,21 @@ function Update-Telemetry {
     try { $stale=(([datetime]::UtcNow-[datetime]::Parse($current.timestamp_utc).ToUniversalTime()).TotalSeconds -gt 20) } catch {}
     $ws=$script:wsState
     $status.Text='Collector: '+$(if ($stale) { 'STALE' } else { 'ACTIVE' })+' | ComfyUI API: '+$current.comfy.status+' | WebSocket: '+$ws+' | '+$script:session
+    $chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %','--')
+    $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
     if ($current.gpu.status -eq 'OK' -and $current.gpu.gpus.Count -gt 0) {
         $g=$current.gpu.gpus[0]
+        $gpuLoad=To-Metric $g.util_pct
         $gpu.Text='GPU: '+$g.name+'  |  Load: '+$g.util_pct+'%'
+        if ($null -ne $gpuLoad) {
+            $chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %',('{0:0}%' -f $gpuLoad))
+        }
         $used=To-Metric $g.vram_used_mib; $total=To-Metric $g.vram_total_mib
         $pct=if ($null -ne $used -and $total -gt 0) {[math]::Round(100*$used/$total,1)} else {0}
         $vram.Text='VRAM: '+$g.vram_used_mib+' / '+$g.vram_total_mib+' MiB ('+$pct+'%)'
+        if ($null -ne $used -and $total -gt 0) {
+            $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %',('{0:0.0}%' -f $pct))
+        }
         $temp.Text='Temperature: '+$g.temperature_c+' °C  |  Power: '+$g.power_w+' W  |  RAM: '+$current.ram.used_mib+' / '+$current.ram.total_mib+' MiB'
     }
     $node.Text='Active node: '+$script:activeNode
