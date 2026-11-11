@@ -120,3 +120,42 @@ jobs:
             dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe
             dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256
           if-no-files-found: error
+
+  publish-lab-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ComfyUI-Diagnostics-Windows-LAB
+          path: release-assets
+      - name: Verify hashes and publish v0.8 LAB prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          test -f ComfyUI-Diagnostics-Setup-v0.8-LAB.exe
+          test -f ComfyUI-Diagnostics-LAB-v0.8.zip
+          echo "$(tr -d '\r\n' < ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256)  ComfyUI-Diagnostics-Setup-v0.8-LAB.exe" | sha256sum -c -
+          echo "$(tr -d '\r\n' < ComfyUI-Diagnostics-LAB-v0.8.sha256)  ComfyUI-Diagnostics-LAB-v0.8.zip" | sha256sum -c -
+          cd ..
+          if gh release view v0.8.0-LAB --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'LAB prerelease exists: preserving published assets; no overwrite'
+            exit 0
+          fi
+          gh release create v0.8.0-LAB \
+            release-assets/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe \
+            release-assets/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256 \
+            release-assets/ComfyUI-Diagnostics-LAB-v0.8.zip \
+            release-assets/ComfyUI-Diagnostics-LAB-v0.8.sha256 \
+            release-assets/package-manifest.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title 'ComfyUI Diagnostics Monitor v0.8.0 LAB CANDIDATE' \
+            --notes-file docs/RELEASE_V08_LAB.md
