@@ -22,7 +22,7 @@ foreach ($f in $files) {
 }
 $expected=@(
  'Install-or-Update.bat','install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','unified.ps1','merge_to_sqlite.py',
- 'lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py',
+ 'lib/ComfyWs.ps1','lib/ComfyHistory.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py',
  'docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md','docs/CPU_RAM_3DSMAX.md','docs/UI_LAYOUT_PASS.md','docs/UI_CONSISTENCY_FIX.md','docs/LEGEND_LIVE_PERCENTAGES.md'
 )
 if (@(Compare-Object -ReferenceObject @($expected|Sort-Object) -DifferenceObject @($paths|Sort-Object)).Count -gt 0) {
