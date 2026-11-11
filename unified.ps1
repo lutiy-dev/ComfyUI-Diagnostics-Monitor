@@ -14,6 +14,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 . (Join-Path $PSScriptRoot 'lib\ComfyWs.ps1')
+. (Join-Path $PSScriptRoot 'lib\ComfyHistory.ps1')
 . (Join-Path $PSScriptRoot 'lib\Updates.ps1')
 $endpoint=[uri]$ComfyUrl
 if ($endpoint.Scheme -ne 'http' -or $endpoint.Host -notin @('localhost','127.0.0.1','::1') -or $endpoint.UserInfo) {
@@ -50,6 +51,8 @@ $script:queueRemaining=$null
 $script:currentPrompt=''
 $script:captureJob=$null
 $script:updateJob=$null
+$script:historyJob=$null
+$script:resultRecords=@()
 $script:ticks=0
 
 function Translate([string]$ru,[string]$en) {
@@ -238,6 +241,88 @@ $history.ForeColor=$text
 $generations.Controls.Add($history)
 $privacy=New-Text $generations 10 516 990 44 'Личные промпты не сохраняются автоматически. История показывает только нормализованные события ComfyUI.' 10
 $privacy.ForeColor=$muted
+$resultButton=New-Button $generations 'Результаты ComfyUI' 760 211 245 35
+$resultPanel=New-Object Windows.Forms.Panel
+$resultPanel.Location=[Drawing.Point]::new(10,252)
+$resultPanel.Size=[Drawing.Size]::new(1002,280)
+$resultPanel.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+$resultPanel.BackColor=$back
+$resultPanel.Visible=$false
+$generations.Controls.Add($resultPanel)
+$resultList=New-Object Windows.Forms.ListBox
+$resultList.Location=[Drawing.Point]::new(0,4)
+$resultList.Size=[Drawing.Size]::new(340,264)
+$resultList.BackColor=$card
+$resultList.ForeColor=$text
+$resultList.Font=[Drawing.Font]::new('Segoe UI',10)
+$resultPanel.Controls.Add($resultList)
+$preview=New-Object Windows.Forms.PictureBox
+$preview.Location=[Drawing.Point]::new(357,4)
+$preview.Size=[Drawing.Size]::new(631,166)
+$preview.BackColor=$card
+$preview.BorderStyle=[Windows.Forms.BorderStyle]::FixedSingle
+$preview.SizeMode=[Windows.Forms.PictureBoxSizeMode]::Zoom
+$resultPanel.Controls.Add($preview)
+$promptView=New-Object Windows.Forms.TextBox
+$promptView.Location=[Drawing.Point]::new(357,182)
+$promptView.Size=[Drawing.Size]::new(631,87)
+$promptView.Multiline=$true
+$promptView.ReadOnly=$true
+$promptView.ScrollBars=[Windows.Forms.ScrollBars]::Vertical
+$promptView.BackColor=$card
+$promptView.ForeColor=$text
+$promptView.Font=[Drawing.Font]::new('Consolas',9)
+$resultPanel.Controls.Add($promptView)
+$resultStatus=New-Text $generations 10 544 990 29 '' 10
+$resultStatus.ForeColor=$muted
+$resultStatus.Visible=$false
+$resultButton.Add_Click({
+    if($resultPanel.Visible){
+        $resultPanel.Visible=$false
+        $history.Visible=$true
+        $privacy.Visible=$true
+        $resultStatus.Visible=$false
+        $resultButton.Text=Translate 'Результаты ComfyUI' 'ComfyUI results'
+        return
+    }
+    $history.Visible=$false
+    $privacy.Visible=$false
+    $resultPanel.Visible=$true
+    $resultPanel.BringToFront()
+    $resultStatus.Visible=$true
+    $resultButton.Text=Translate 'События' 'Events'
+    $resultList.Items.Clear()
+    $script:resultRecords=@()
+    $promptView.Text=''
+    if($null -ne $preview.Image){$preview.Image.Dispose();$preview.Image=$null}
+    if($null -ne $script:historyJob){return}
+    $resultStatus.Text=Translate 'Чтение локальной истории ComfyUI...' 'Reading localhost ComfyUI history...'
+    $script:historyJob=Start-Job -ScriptBlock {
+        param($helper,$endpoint)
+        . $helper
+        Get-LocalComfyHistory -ComfyUrl $endpoint
+    } -ArgumentList (Join-Path $PSScriptRoot 'lib\ComfyHistory.ps1'),$ComfyUrl
+})
+$resultList.Add_SelectedIndexChanged({
+    $i=$resultList.SelectedIndex
+    if($i -lt 0 -or $i -ge $script:resultRecords.Count){return}
+    $entry=$script:resultRecords[$i]
+    $promptView.Text=if($entry.prompt_text){[string]$entry.prompt_text}else{Translate 'Текстовые промпты не найдены.' 'No text prompt fields found.'}
+    try {
+        $bytes=Get-LocalComfyPreview -ComfyUrl $ComfyUrl -Filename $entry.filename -Subfolder $entry.subfolder -Type $entry.type
+        $mem=New-Object IO.MemoryStream(,$bytes)
+        try {
+            $original=[Drawing.Image]::FromStream($mem)
+            try{$new=New-Object Drawing.Bitmap($original)}finally{$original.Dispose()}
+        }finally{$mem.Dispose()}
+        if($null -ne $preview.Image){$preview.Image.Dispose()}
+        $preview.Image=$new
+        $resultStatus.Text=[string]$entry.filename
+    }catch{
+        if($null -ne $preview.Image){$preview.Image.Dispose();$preview.Image=$null}
+        $resultStatus.Text=Translate 'Превью недоступно.' 'Preview unavailable.'
+    }
+})
 
 $evTitle=New-Text $evidencePage 10 3 650 34 'Центр диагностики' 14 -bold
 $evDescription=New-Text $evidencePage 10 46 940 30 'Локальный отчёт JSON без автоматической отправки.' 10
@@ -302,6 +387,7 @@ function Apply-Language {
     $progressCaption.Text=Translate 'Шаги генерации' 'Generation steps'
     $historyTitle.Text=Translate 'События генераций (без промптов)' 'Generation events (no prompts)'
     $privacy.Text=Translate 'Личные промпты не сохраняются автоматически. История содержит только нормализованные события.' 'Private prompts are not stored automatically. History contains only normalized events.'
+    $resultButton.Text=if($resultPanel.Visible){Translate 'События' 'Events'}else{Translate 'Результаты ComfyUI' 'ComfyUI results'}
     $incidentTitle.Text=Translate 'Последние события' 'Recent events'
     $evTitle.Text=Translate 'Центр диагностики' 'Diagnostics center'
     $evDescription.Text=Translate 'Локальный отчёт JSON без автоматической отправки.' 'Local JSON report; no automatic upload.'
@@ -581,6 +667,19 @@ $script:tick.Add_Tick({
         try{Update-Monitor;Update-Events;Update-Generation}catch{$collectorStatus.Text=Translate 'Ошибка обновления UI' 'UI update error'}
     }
     if($script:hudVisible){$script:hud.Invalidate()}
+    if($null -ne $script:historyJob -and $script:historyJob.State -in @('Completed','Failed','Stopped')){
+        $ok=$script:historyJob.State -eq 'Completed'
+        $items=@(Receive-Job -Job $script:historyJob -ErrorAction SilentlyContinue)
+        Remove-Job -Job $script:historyJob -Force -ErrorAction SilentlyContinue
+        $script:historyJob=$null
+        if($ok) {
+            $script:resultRecords=@($items|Where-Object {$null -ne $_.filename})
+            foreach($entry in $script:resultRecords){[void]$resultList.Items.Add([string]$entry.filename)}
+            $resultStatus.Text=if($script:resultRecords.Count -gt 0){
+                (Translate 'Результатов: ' 'Results: ')+$script:resultRecords.Count
+            }else{Translate 'Изображений в истории не найдено.' 'No images found in local history.'}
+        }else{$resultStatus.Text=Translate 'История ComfyUI недоступна.' 'ComfyUI history unavailable.'}
+    }
     if($null -ne $script:captureJob -and $script:captureJob.State -in @('Completed','Failed','Stopped')){
         $out=@(Receive-Job -Job $script:captureJob -ErrorAction SilentlyContinue)
         $bad=$script:captureJob.State -ne 'Completed'
@@ -618,6 +717,8 @@ $form.Add_FormClosing({
     $script:tick.Stop()
     Disconnect-Comfy
     if($null -ne $script:captureJob){try{Stop-Job -Job $script:captureJob -ErrorAction SilentlyContinue}catch{};Remove-Job -Job $script:captureJob -Force -ErrorAction SilentlyContinue}
+    if($null -ne $script:historyJob){try{Stop-Job -Job $script:historyJob -ErrorAction SilentlyContinue}catch{};Remove-Job -Job $script:historyJob -Force -ErrorAction SilentlyContinue}
+    if($null -ne $preview.Image){$preview.Image.Dispose();$preview.Image=$null}
     Stop-ManagedCollector
     $script:tray.Visible=$false;$script:tray.Dispose();$menu.Dispose()
     $script:hud.Close();$script:hud.Dispose();$script:wsMessage.Dispose()
