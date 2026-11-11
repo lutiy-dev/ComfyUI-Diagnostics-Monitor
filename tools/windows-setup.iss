@@ -22,7 +22,6 @@ Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64
 MinVersion=10.0.17763
-SetupIconFile=
 DisableWelcomePage=no
 
 [Files]
