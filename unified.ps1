@@ -6,7 +6,8 @@ param(
     [string]$DataDir=(Join-Path $env:LOCALAPPDATA 'ComfyUI-Diagnostics'),
     [string]$ComfyUrl='http://127.0.0.1:8188',
     [string]$ComfyLog='',
-    [switch]$SelfTest
+    [switch]$SelfTest,
+    [switch]$IntegrationTest
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -639,7 +640,24 @@ if($SelfTest) {
     return
 }
 $form.Add_Shown({Start-ManagedCollector})
+if ($IntegrationTest) {
+    $script:integrationSuccess=$false
+    $script:integrationTimer=New-Object Windows.Forms.Timer
+    $script:integrationTimer.Interval=12000
+    $script:integrationTimer.Add_Tick({
+        $script:integrationTimer.Stop()
+        $samples=@(Get-ChildItem -LiteralPath $DataDir -Filter ('telemetry_'+$Machine+'_*.jsonl') -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTimeUtc -gt [datetime]::UtcNow.AddMinutes(-1) })
+        $script:integrationSuccess=($samples.Count -gt 0 -and $script:collectorOwned -and $script:collectorState -eq 'STARTED')
+        $form.Close()
+    })
+    $script:integrationTimer.Start()
+}
 $script:tick.Start()
 # ApplicationContext keeps the process running when F9 HUD hides the main form.
 $ctx=New-Object Windows.Forms.ApplicationContext($form)
 [Windows.Forms.Application]::Run($ctx)
+if($IntegrationTest) {
+    $script:integrationTimer.Dispose()
+    if(-not $script:integrationSuccess){throw 'FAIL: managed Collector did not write fresh telemetry while unified WinForms ran'}
+    Write-Host 'PASS: unified UI runspace Collector produced telemetry and closed cleanly'
+}
