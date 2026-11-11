@@ -1,4 +1,4 @@
-# ComfyUI Diagnostics LAB v0.4. Windows PowerShell 5.1, read-only, localhost only.
+# ComfyUI Diagnostics LAB v0.7 UI candidate. Windows PowerShell 5.1, read-only, localhost only.
 # Keep collector.ps1 running separately for GPU/Windows sampling.
 param(
   [ValidateSet('HOME','WORK')][string]$Machine='HOME',
@@ -152,6 +152,7 @@ if(Test-Path -LiteralPath $uiManifest -PathType Leaf){
 $form.Text="ComfyUI Diagnostics | $Machine | $uiVersion"
 $form.Size=[Drawing.Size]::new(960,740)
 $form.MinimumSize=[Drawing.Size]::new(960,740)
+$form.AutoScaleMode=[Windows.Forms.AutoScaleMode]::Font
 $form.BackColor=[Drawing.Color]::FromArgb(20,24,30)
 $form.ForeColor=[Drawing.Color]::FromArgb(235,240,245)
 $form.Font=[Drawing.Font]::new('Segoe UI',10)
@@ -160,6 +161,9 @@ $uiYellow=[Drawing.Color]::FromArgb(255,212,0)
 $uiPanel=[Drawing.Color]::FromArgb(31,38,47)
 $uiStroke=[Drawing.Color]::FromArgb(71,84,99)
 $uiText=[Drawing.Color]::FromArgb(235,240,245)
+$uiMuted=[Drawing.Color]::FromArgb(169,184,199)
+$uiWarn=[Drawing.Color]::FromArgb(255,177,92)
+$uiGood=[Drawing.Color]::FromArgb(139,218,173)
 function Set-DiagnosticsButton([Windows.Forms.Button]$control,[switch]$Primary) {
     $control.UseVisualStyleBackColor=$false
     $control.FlatStyle=[Windows.Forms.FlatStyle]::Flat
@@ -195,22 +199,32 @@ function New-Label([string]$name,[int]$x,[int]$y,[int]$width,[int]$height,[int]$
 $title=New-Label 'GPU / ComfyUI Diagnostics' 20 12 600 36 18
 $title.Font=[Drawing.Font]::new('Segoe UI',17,[Drawing.FontStyle]::Bold)
 $status=New-Label 'Collector: waiting | WebSocket: connecting' 22 55 900 25 10
+$status.ForeColor=$uiMuted
+$status.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $gpu=New-Label 'GPU: -' 22 94 880 26 13
 $gpu.ForeColor=[Drawing.Color]::DeepSkyBlue
+$gpu.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $vram=New-Label 'VRAM: -' 22 128 880 26 13
 $vram.ForeColor=[Drawing.Color]::Orange
+$vram.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $temp=New-Label 'Temperature: -  |  Power: -  |  RAM: -' 22 160 900 25 11
+$temp.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+$temp.ForeColor=$uiMuted
 $node=New-Label 'Node: -' 22 200 880 30 13
+$node.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $progress=New-Object Windows.Forms.ProgressBar
 $progress.Location=[Drawing.Point]::new(22,237)
 $progress.Size=[Drawing.Size]::new(790,20)
+$progress.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $progress.Minimum=0; $progress.Maximum=100
 $form.Controls.Add($progress)
 $steps=New-Label 'Sampler: -' 820 233 120 26 10
+$steps.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
 
 $chart=New-Object Windows.Forms.DataVisualization.Charting.Chart
 $chart.Location=[Drawing.Point]::new(20,280)
 $chart.Size=[Drawing.Size]::new(905,220)
+$chart.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $chart.BackColor=$uiPanel
 $area=New-Object Windows.Forms.DataVisualization.Charting.ChartArea 'Telemetry'
 $area.BackColor=$chart.BackColor
@@ -219,6 +233,8 @@ $area.AxisX.MajorGrid.Enabled=$false
 $area.AxisY.Minimum=0; $area.AxisY.Maximum=100
 $area.AxisY.LabelStyle.ForeColor=[Drawing.Color]::White
 $area.AxisY.MajorGrid.LineColor=[Drawing.Color]::FromArgb(55,65,75)
+$area.AxisY.LineColor=$uiStroke
+$area.AxisX.LineColor=$uiStroke
 $chart.ChartAreas.Add($area)
 foreach ($spec in @(@('GPU %','DeepSkyBlue'),@('VRAM %','Orange'))) {
     $series=New-Object Windows.Forms.DataVisualization.Charting.Series $spec[0]
@@ -229,21 +245,27 @@ foreach ($spec in @(@('GPU %','DeepSkyBlue'),@('VRAM %','Orange'))) {
 $legend=New-Object Windows.Forms.DataVisualization.Charting.Legend
 $legend.ForeColor=[Drawing.Color]::White
 $legend.BackColor=$chart.BackColor
+$legend.Docking=[Windows.Forms.DataVisualization.Charting.Docking]::Right
+$legend.Alignment=[Drawing.StringAlignment]::Near
+$legend.IsDockedInsideChartArea=$false
 # Monospaced right-aligned numeric column, preserving built-in GPU/VRAM colors.
 $legend.Font=[Drawing.Font]::new('Consolas',9)
 $chart.Legends.Add($legend)
 $chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %','--')
 $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
 $form.Controls.Add($chart)
-$null=New-Label 'Incident timeline (normalized events, no prompts)' 22 510 800 25 11
+$incidentTitle=New-Label 'Incident timeline (normalized events, no prompts)' 22 510 800 25 11
+$incidentTitle.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+$incidentTitle.ForeColor=$uiMuted
 $incident=New-Object Windows.Forms.TextBox
 $incident.Location=[Drawing.Point]::new(22,540)
 $incident.Size=[Drawing.Size]::new(904,145)
+$incident.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Bottom -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $incident.Multiline=$true
 $incident.ReadOnly=$true
 $incident.ScrollBars='Vertical'
 $incident.BackColor=$uiPanel
-$incident.ForeColor=[Drawing.Color]::White
+$incident.ForeColor=$uiText
 $incident.Font=[Drawing.Font]::new('Consolas',9)
 $form.Controls.Add($incident)
 
@@ -254,6 +276,7 @@ $hudButton=New-Object System.Windows.Forms.Button
 $hudButton.Text='HUD (F9)'
 $hudButton.Location=[Drawing.Point]::new(784,12)
 $hudButton.Size=[Drawing.Size]::new(136,34)
+$hudButton.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
 Set-DiagnosticsButton $hudButton
 $form.Controls.Add($hudButton)
 $hudButton.Add_Click({Switch-ToHud})
@@ -261,6 +284,7 @@ $updatesButton=New-Object System.Windows.Forms.Button
 $updatesButton.Text='Check updates'
 $updatesButton.Location=[Drawing.Point]::new(626,12)
 $updatesButton.Size=[Drawing.Size]::new(152,34)
+$updatesButton.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
 Set-DiagnosticsButton $updatesButton
 $form.Controls.Add($updatesButton)
 $updatesButton.Add_Click({
@@ -306,18 +330,19 @@ function To-Metric([object]$value) {
 }
 function Update-Telemetry {
     $paths=@(Get-ChildItem -LiteralPath $DataDir -Filter ("telemetry_"+$Machine+"_*.jsonl") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-    if ($paths.Count -eq 0) { $status.Text='Collector: NO DATA | WebSocket: '+$script:wsState; return }
+    if ($paths.Count -eq 0) { $status.Text='Collector: NO DATA | WebSocket: '+$script:wsState; $status.ForeColor=$uiWarn; return }
     $raw=@(Get-Content -LiteralPath $paths[0].FullName -Tail 120 -ErrorAction SilentlyContinue)
     $valid=@()
     foreach ($line in $raw) {
         try { $valid+=ConvertFrom-Json -InputObject $line -ErrorAction Stop } catch {}
     }
-    if ($valid.Count -eq 0) { return }
+    if ($valid.Count -eq 0) { $status.Text='Collector: NO VALID DATA | WebSocket: '+$script:wsState; $status.ForeColor=$uiWarn; return }
     $current=$valid[-1]
     $stale=$true
     try { $stale=(([datetime]::UtcNow-[datetime]::Parse($current.timestamp_utc).ToUniversalTime()).TotalSeconds -gt 20) } catch {}
     $ws=$script:wsState
     $status.Text='Collector: '+$(if ($stale) { 'STALE' } else { 'ACTIVE' })+' | ComfyUI API: '+$current.comfy.status+' | WebSocket: '+$ws+' | '+$script:session
+    $status.ForeColor=if($stale){$uiWarn}else{$uiGood}
     $chart.Series['GPU %'].LegendText=('{0,-7}{1,6}' -f 'GPU %','--')
     $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
     if ($current.gpu.status -eq 'OK' -and $current.gpu.gpus.Count -gt 0) {
@@ -379,7 +404,7 @@ $timer.Add_Tick({
         $script:ticks++
         if ($script:ticks % 3 -eq 0) { Update-Telemetry; Update-Incidents }
         if ($script:hudVisible) { $script:hud.Invalidate() }
-    } catch { $status.Text='Monitor UI warning (see PowerShell console)' }
+    } catch { $status.Text='Monitor UI warning (see PowerShell console)'; $status.ForeColor=$uiWarn }
 })
 # Keep the WinForms message loop alive when the main window is hidden for HUD.
 # ShowDialog() exits on Hide(), causing the PowerShell process to terminate.
