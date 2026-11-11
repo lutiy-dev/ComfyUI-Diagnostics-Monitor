@@ -34,6 +34,7 @@ jobs:
           Write-Host 'PASS: installed icon validated by .NET'
           & (Join-Path $inst 'launch.ps1') -Mode Dashboard -SelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Monitor -SelfTest
+          & (Join-Path $inst 'unified.ps1') -Machine HOME -DataDir $data -IntegrationTest
           & (Join-Path $inst 'launch.ps1') -Mode Collector -SelfTest
           & (Join-Path $inst 'launch.ps1') -Mode Configurator -SelfTest
           & (Join-Path $inst 'configurator.ps1') -Machine HOME -DataRoot $data -ComfyLog '' -SelfTest -CaptureSelfTest
