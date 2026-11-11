@@ -126,6 +126,19 @@ $open.Location=[Drawing.Point]::new(245,458)
 $open.Size=[Drawing.Size]::new(214,41)
 Set-DiagnosticsButton $open
 $window.Controls.Add($open)
+$logsButton=New-Object Windows.Forms.Button
+$logsButton.Text='Open Logs Folder'
+$logsButton.Location=[Drawing.Point]::new(475,458)
+$logsButton.Size=[Drawing.Size]::new(194,41)
+Set-DiagnosticsButton $logsButton
+$window.Controls.Add($logsButton)
+$logsButton.Add_Click({
+    if (-not (Test-Path -LiteralPath $DataRoot -PathType Container)) {
+        [void][Windows.Forms.MessageBox]::Show('Diagnostics folder is not available.','ComfyUI Diagnostics')
+        return
+    }
+    [void][Diagnostics.Process]::Start('explorer.exe',('"'+$DataRoot+'"'))
+})
 $status=LabelText 'Ready - all captures are manually triggered.' 21 515 645 72
 $status.ForeColor=$uiMuted
 $status.Anchor=[Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
@@ -171,7 +184,7 @@ $button.Add_Click({
  } finally { $button.Enabled=$true }
 })
 if($SelfTest) {
- if($null -eq $checks.Windows -or -not $button.Enabled -or $hours.Value -ne 3){throw 'FAIL: Configurator controls'}
+ if($null -eq $checks.Windows -or -not $button.Enabled -or -not $logsButton.Enabled -or $hours.Value -ne 3){throw 'FAIL: Configurator controls'}
  if($CaptureSelfTest){
   foreach($key in @($checks.Keys)){$checks[$key].Checked=$false}
   $before=@(Get-ChildItem -LiteralPath (Join-Path $DataRoot 'evidence') -Filter 'evidence_*.json' -File -ErrorAction SilentlyContinue).Count
