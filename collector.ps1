@@ -65,6 +65,29 @@ function Read-Ram {
     return @{used_mib=[math]::Round(($o.TotalVisibleMemorySize-$o.FreePhysicalMemory)/1024);total_mib=[math]::Round($o.TotalVisibleMemorySize/1024)}
   } catch { return @{status='UNAVAILABLE'} }
 }
+function Read-Cpu {
+  try {
+    $cpus=@(Get-CimInstance Win32_Processor -ErrorAction Stop)
+    if ($cpus.Count -eq 0) { return @{status='UNAVAILABLE'} }
+    $loads=@($cpus | ForEach-Object { if ($null -ne $_.LoadPercentage) { [double]$_.LoadPercentage } })
+    if ($loads.Count -eq 0) { return @{status='UNAVAILABLE'} }
+    $mean=[math]::Round((($loads | Measure-Object -Average).Average),1)
+    return @{status='OK';util_pct=$mean}
+  } catch { return @{status='UNAVAILABLE'} }
+}
+function Read-3dsMaxMemory {
+  try {
+    $procs=@(Get-Process -Name '3dsmax' -ErrorAction SilentlyContinue)
+    if ($procs.Count -eq 0) { return @{status='NOT_RUNNING';count=0} }
+    [double]$ws=0
+    [double]$private=0
+    foreach($p in $procs) {
+      $ws+=[double]$p.WorkingSet64
+      $private+=[double]$p.PrivateMemorySize64
+    }
+    return @{status='OK';count=$procs.Count;working_set_mib=[math]::Round($ws/1MB);private_mib=[math]::Round($private/1MB)}
+  } catch { return @{status='UNAVAILABLE'} }
+}
 function Read-LogSignature {
   if (-not $ComfyLog -or -not (Test-Path -LiteralPath $ComfyLog)) { return @{status='MISSING'} }
   try {
@@ -103,7 +126,7 @@ Write-Host "ComfyUI Diagnostics LAB v0.3 | $Machine | local only"
 Write-Host "Data: $DataDir | Ctrl+C to stop"
 while ($true) {
   try {
-    Append-Record $telemetry @{schema=1;machine=$Machine;source='collector';timestamp_utc=(Get-Date).ToUniversalTime().ToString('o');gpu=(Read-Gpu);ram=(Read-Ram);comfy=(Read-Comfy);comfy_log=(Read-LogSignature)}
+    Append-Record $telemetry @{schema=1;machine=$Machine;source='collector';timestamp_utc=(Get-Date).ToUniversalTime().ToString('o');gpu=(Read-Gpu);ram=(Read-Ram);cpu=(Read-Cpu);max_memory=(Read-3dsMaxMemory);comfy=(Read-Comfy);comfy_log=(Read-LogSignature)}
     Read-WindowsEvents
   } catch { Write-Warning 'Collection cycle failed' }
   Start-Sleep -Seconds $IntervalSeconds
