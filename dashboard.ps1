@@ -259,7 +259,7 @@ $chart.Series['VRAM %'].LegendText=('{0,-7}{1,6}' -f 'VRAM %','--')
 $chart.Series['CPU %'].LegendText=('{0,-7}{1,6}' -f 'CPU %','--')
 $chart.Series['RAM %'].LegendText=('{0,-7}{1,6}' -f 'RAM %','--')
 $form.Controls.Add($chart)
-$incidentTitle=New-Label 'Incident timeline (normalized events, no prompts)' 22 510 800 25 11
+$incidentTitle=New-Label 'Incident timeline (normalized events, no prompts)' 22 510 670 25 11
 $incidentTitle.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $incidentTitle.ForeColor=$uiMuted
 $incident=New-Object Windows.Forms.TextBox
@@ -273,6 +273,20 @@ $incident.BackColor=$uiPanel
 $incident.ForeColor=$uiText
 $incident.Font=[Drawing.Font]::new('Consolas',9)
 $form.Controls.Add($incident)
+$logsButton=New-Object Windows.Forms.Button
+$logsButton.Text='Open Logs Folder'
+$logsButton.Location=[Drawing.Point]::new(748,507)
+$logsButton.Size=[Drawing.Size]::new(176,29)
+$logsButton.Anchor=[Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+Set-DiagnosticsButton $logsButton
+$form.Controls.Add($logsButton)
+$logsButton.Add_Click({
+    if (-not (Test-Path -LiteralPath $DataDir -PathType Container)) {
+        [void][Windows.Forms.MessageBox]::Show('Diagnostics folder is not available.','ComfyUI Diagnostics')
+        return
+    }
+    [void][Diagnostics.Process]::Start('explorer.exe',('"'+$DataDir+'"'))
+})
 
 . (Join-Path $PSScriptRoot 'lib\Updates.ps1')
 . (Join-Path $PSScriptRoot 'lib\Hud.ps1')
