@@ -25,6 +25,14 @@ $marker=Join-Path $InstallRoot 'installation.json'
 if (Test-Path -LiteralPath $InstallRoot) {
     if (-not (Test-Path -LiteralPath $marker)) { throw "STOP: destination exists but is not a managed installation: $InstallRoot" }
     if (-not $Upgrade) { throw 'Already installed. Specify -Upgrade to update program files; data stays untouched.' }
+    # Keep an existing ComfyUI log path unless explicitly overridden by the user.
+    $previousConfig=Join-Path $InstallRoot 'config.json'
+    if (-not $ComfyLog -and (Test-Path -LiteralPath $previousConfig -PathType Leaf)) {
+        try {
+            $prior=Get-Content -LiteralPath $previousConfig -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            $ComfyLog=[string]$prior.comfy_log
+        } catch { throw 'STOP: existing config.json is unreadable; upgrade not started' }
+    }
 }
 $null=New-Item -ItemType Directory -Force -Path (Join-Path $InstallRoot 'lib')
 $null=New-Item -ItemType Directory -Force -Path $DataRoot
@@ -59,7 +67,7 @@ $config=[ordered]@{
 [IO.File]::WriteAllText((Join-Path $InstallRoot 'config.json'),($config|ConvertTo-Json -Depth 3),(New-Object Text.UTF8Encoding($false)))
 $manifest=[ordered]@{
     product='ComfyUI-Diagnostics'
-    version='0.7.0-LAB-CANDIDATE'
+    version='0.8.0-LAB-CANDIDATE'
     installed_utc=[DateTime]::UtcNow.ToString('o')
     install_root=$InstallRoot
     data_root=$DataRoot
