@@ -139,9 +139,9 @@ jobs:
         run: |
           set -euo pipefail
           cd release-assets
-          test -f ComfyUI-Diagnostics-Setup-v0.8-LAB.exe
+          test -f dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe
           test -f ComfyUI-Diagnostics-LAB-v0.8.zip
-          echo "$(tr -d '\r\n' < ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256)  ComfyUI-Diagnostics-Setup-v0.8-LAB.exe" | sha256sum -c -
+          echo "$(tr -d '\r\n' < dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256)  dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe" | sha256sum -c -
           echo "$(tr -d '\r\n' < ComfyUI-Diagnostics-LAB-v0.8.sha256)  ComfyUI-Diagnostics-LAB-v0.8.zip" | sha256sum -c -
           cd ..
           if gh release view v0.8.0-LAB --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -149,8 +149,8 @@ jobs:
             exit 0
           fi
           gh release create v0.8.0-LAB \
-            release-assets/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe \
-            release-assets/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256 \
+            release-assets/dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.exe \
+            release-assets/dist/ComfyUI-Diagnostics-Setup-v0.8-LAB.sha256 \
             release-assets/ComfyUI-Diagnostics-LAB-v0.8.zip \
             release-assets/ComfyUI-Diagnostics-LAB-v0.8.sha256 \
             release-assets/package-manifest.json \
