@@ -1,4 +1,4 @@
-# v0.9 LAB: single-window Windows Forms UI. Collector runs in an in-process runspace.
+﻿# v0.9 LAB: single-window Windows Forms UI. Collector runs in an in-process runspace.
 # Read-only by default; no ComfyUI mutation, GPU reset or automatic cache clearing.
 [CmdletBinding()]
 param(
