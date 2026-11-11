@@ -4,6 +4,14 @@
 
 > **v0.8.0 LAB CANDIDATE — NOT PRODUCTION.** Windows CI validates package creation, installation and automated regressions. Real GPU hardware, high-DPI layout, long-running Collector and system freeze capture require continued HOME/WORK acceptance. This utility does not diagnose hardware failures with certainty.
 
+## Dashboard preview
+
+![Real ComfyUI Diagnostics Dashboard captured on HOME RTX 3070 Ti during an earlier LAB UI test](docs/images/dashboard-home-lab-v04.png)
+
+*Authentic HOME RTX 3070 Ti screenshot from the earlier LAB v0.4 UI (November 8, 2026). This is historical test evidence, **not** a screenshot of the current v0.8.0 interface. Current UI adds CPU/RAM/3ds Max monitoring, enhanced styling and a one-click logs folder shortcut; updated v0.8 screenshots require real host visual acceptance.*
+
+
+
 Read-only monitoring for creative Windows workstations: inspect GPU / VRAM, CPU / RAM, 3ds Max process memory, Windows reliability events and local ComfyUI execution, without modifying your 3D projects, AI models or drivers.
 
 ## Features
