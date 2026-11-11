@@ -1,19 +1,19 @@
-# In-app updates: safety design and staged implementation
+# In-app updates — v0.8 LAB policy
 
-**Status:** LAB / UPDATE DISCOVERY ONLY. **No automatic installation in v0.5.**
+**Implemented:** Once per Dashboard launch, a separate PowerShell job reads the official GitHub published releases metadata (including LAB prereleases), using a bounded HTTPS request. It never pauses Dashboard rendering for the request. If a newer version is found, the **Update available** button becomes visible; clicking it requests confirmation before opening the official release page.
 
-The Dashboard now has **Check updates**. It only queries the official HTTPS GitHub releases/latest endpoint on explicit click. Compares installed version (installation.json, fallback 0.5.0-LAB), reports if a newer stable release exists, and *offers to open the official release page*. It never downloads packages, launches installers, changes ComfyUI, or changes Windows execution policy.
+**Not implemented:** unattended download, extraction, in-place automatic installation, restart or update of a running Collector. Existing unsigned installer can be launched manually after review. No driver/model/config mutator, no scheduled task.
 
-If no stable release is published, API unreachable, or metadata invalid: show a neutral failure message without changing anything. Offline tests validate release-version comparison. Network access to GitHub is initiated **only by clicking**; local Collector remains offline-only.
+## Why automatic install is disabled
 
-## Upgrade roadmap
-One-click installation from the UI requires these gates before enabling:
-1. Versioned signed Windows distribution or verified Authenticode signer; no untrusted self-signed certificate.
-2. Download of explicitly chosen release from trusted source, verify the signed manifest and SHA256; no unsigned automatic execution.
-3. Close running Dashboard/Collector safely; backup existing installed code and keep local data untouched.
-4. Atomic swap/staged install and rollback on startup validation failure.
-5. Report version, changelog, risks and user confirmation before applying.
-6. HOME and WORK tests for in-place install, no duplicate collector, pinned shortcuts, preserves data, failure rollback and Windows Defender/Chrome clean verdict.
+Current EXE is unsigned; SHA256 is an integrity checksum but does not authenticate the publisher. Automated execution would require an Authenticode signature and signer validation, atomic or staged program rollback, safe shutdown/restore of collector and open WinForms windows, and test evidence on HOME/WORK. An unattended update with any of those gates missing is **STOP**.
 
-## Known limits
-GitHub Actions success or checksum is not proof of benign/safe downloaded code. A draft PR is not a published release. Keep auto-install disabled until all required gates pass.
+## Update checklist
+
+1. Verify the GitHub release is authored by the expected repository and the release tag is newer than the installed `installation.json` version.
+2. Download the matching official EXE or ZIP, verify its `.sha256` asset and Windows Defender/SmartScreen verdict.
+3. Close Dashboard/Configurator/Collector; preserve local diagnostics and the previous installer.
+4. Run EXE or BAT with explicit confirmation, inspect success/failure and the installed version.
+5. Reopen and validate GUI/HUD/Collector before accepting the upgrade.
+
+The release discovery query is read-only and does not send diagnostic files, prompts or user activity. A GitHub API error or missing release is neutral `UNAVAILABLE`; do not invent a version or install URL.
