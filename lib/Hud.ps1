@@ -11,7 +11,7 @@ function Initialize-Hud {
     $script:hud.ShowInTaskbar=$false
     $script:hud.TopMost=$true
     $script:hud.StartPosition=[System.Windows.Forms.FormStartPosition]::Manual
-    $script:hud.Size=[Drawing.Size]::new(420,160)
+    $script:hud.Size=[Drawing.Size]::new(420,200)
     $script:hud.BackColor=[Drawing.Color]::Magenta
     $script:hud.TransparencyKey=[Drawing.Color]::Magenta
     $script:hud.KeyPreview=$true
@@ -27,7 +27,13 @@ function Initialize-Hud {
         $white=[Drawing.Brushes]::White
         $cyan=New-Object Drawing.Pen([Drawing.Color]::DeepSkyBlue,2)
         $orange=New-Object Drawing.Pen([Drawing.Color]::Orange,2)
+        $back=New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(20,24,30))
+        $outline=New-Object Drawing.Pen([Drawing.Color]::FromArgb(71,84,99),1)
+        $muted=New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(169,184,199))
         try {
+            $g.FillRectangle($back,0,0,($script:hud.ClientSize.Width-1),($script:hud.ClientSize.Height-1))
+            $g.DrawRectangle($outline,0,0,($script:hud.ClientSize.Width-1),($script:hud.ClientSize.Height-1))
+            $g.DrawString(('COMFYUI DIAGNOSTICS  |  '+$Machine),$small,$muted,12,7)
             $label="GPU: no data"
             $detail="VRAM: no data"
             if ($null -ne $script:gpu -and $script:gpu.Text -match 'Load:') { $label=$script:gpu.Text }
@@ -35,13 +41,18 @@ function Initialize-Hud {
             $cyanBrush=New-Object Drawing.SolidBrush([Drawing.Color]::DeepSkyBlue)
             $orangeBrush=New-Object Drawing.SolidBrush([Drawing.Color]::Orange)
             try {
-                $g.DrawString($label,$font,$cyanBrush,8,3)
-                $g.DrawString($detail,$small,$orangeBrush,8,28)
+                $g.DrawString($label,$font,$cyanBrush,12,29)
+                $g.DrawString($detail,$small,$orangeBrush,12,57)
             } finally { $cyanBrush.Dispose(); $orangeBrush.Dispose() }
-            $g.DrawString("ComfyUI: "+$script:session+" | "+$script:wsState,$small,$white,8,47)
+            $g.DrawString("ComfyUI: "+$script:session+" | "+$script:wsState,$small,$white,12,79)
             $stepText=if ($script:stepTotal -gt 0) { "Step $($script:step)/$($script:stepTotal)" } else { "Node: $($script:activeNode)" }
-            $g.DrawString($stepText,$small,$white,8,66)
-            $left=10; $top=94; $width=395; $height=52
+            $g.DrawString($stepText,$small,$muted,12,99)
+            $left=12; $top=128; $width=395; $height=54
+            $grid=New-Object Drawing.Pen([Drawing.Color]::FromArgb(58,70,83),1)
+            try {
+                $g.DrawLine($grid,$left,[single]($top+$height/2),($left+$width),[single]($top+$height/2))
+                $g.DrawLine($grid,$left,($top+$height),($left+$width),($top+$height))
+            } finally {$grid.Dispose()}
             foreach ($metric in @(@('GPU %',$cyan),@('VRAM %',$orange))) {
                 $series=$script:chart.Series[$metric[0]]
                 $count=$series.Points.Count
@@ -60,6 +71,7 @@ function Initialize-Hud {
             }
         } finally {
             $font.Dispose();$small.Dispose();$cyan.Dispose();$orange.Dispose()
+            $back.Dispose();$outline.Dispose();$muted.Dispose()
         }
     })
     $script:hud.Add_MouseDown({
