@@ -208,6 +208,46 @@
      </Grid>
     </Grid>
    </TabItem>
+   <TabItem x:Name="GpuProcessesTab" Header="GPU-процессы">
+    <Grid Margin="0,18,0,0">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Grid Margin="0,0,0,12">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel>
+       <TextBlock x:Name="GpuProcessesTitle" Text="Кто использует видеопамять" FontSize="18" FontWeight="SemiBold"/>
+       <TextBlock x:Name="GpuProcessesSubtitle" Text="Windows WDDM · обновление каждые 5 сек, только при открытой вкладке" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"/>
+      </StackPanel>
+      <Button x:Name="RefreshGpuProcessesButton" Grid.Column="1" Content="Обновить" VerticalAlignment="Center"/>
+     </Grid>
+     <Border Grid.Row="1" Background="{StaticResource Card}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+      <Grid>
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock x:Name="GpuProcessesStatus" Text="Ожидание данных Windows GPU Process Memory" Foreground="#C9A869" VerticalAlignment="Center" FontSize="13"/>
+       <TextBlock x:Name="GpuProcessesUpdated" Grid.Column="1" Foreground="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"/>
+      </Grid>
+     </Border>
+     <Border Grid.Row="2" Background="{StaticResource Panel}" CornerRadius="11" Padding="12">
+      <DataGrid x:Name="GpuProcessesTable" Background="#20252B" Foreground="#E5EAF0"
+       BorderThickness="0" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+       CanUserDeleteRows="False" CanUserResizeRows="False"
+       HeadersVisibility="Column" RowHeaderWidth="0" GridLinesVisibility="Horizontal"
+       HorizontalGridLinesBrush="#333C46" VerticalGridLinesBrush="#333C46"
+       RowBackground="#222930" AlternatingRowBackground="#2A3038"
+       AlternationCount="2" ColumnHeaderHeight="38" RowHeight="33"
+       EnableRowVirtualization="True" SelectionMode="Single">
+       <DataGrid.Columns>
+        <DataGridTextColumn x:Name="GpuProcessNameColumn" Header="Процесс" Binding="{Binding Name}" Width="*"/>
+        <DataGridTextColumn x:Name="GpuProcessIdColumn" Header="PID" Binding="{Binding Pid}" Width="90"/>
+        <DataGridTextColumn x:Name="GpuProcessDedicatedColumn" Header="VRAM, МиБ" Binding="{Binding DedicatedMiB, StringFormat=F1}" Width="140"/>
+        <DataGridTextColumn x:Name="GpuProcessSharedColumn" Header="Общая, МиБ" Binding="{Binding SharedMiB, StringFormat=F1}" Width="140"/>
+       </DataGrid.Columns>
+      </DataGrid>
+     </Border>
+     <TextBlock x:Name="GpuProcessesDisclaimer" Grid.Row="3" TextWrapping="Wrap" FontSize="12"
+      Foreground="{StaticResource Muted}" Margin="2,12,0,0"
+      Text="WDDM: значения по процессам поступают из счётчиков Windows, не из NVIDIA-SMI. Они могут отличаться от общего VRAM и не обязательно суммируются. Нет данных ≠ 0 МиБ."/>
+    </Grid>
+   </TabItem>
    <TabItem x:Name="EvidenceTab" Header="Диагностика">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
      <StackPanel Margin="0,18,0,0">
