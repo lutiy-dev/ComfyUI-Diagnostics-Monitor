@@ -17,7 +17,7 @@ if ($InstallRoot -eq [IO.Path]::GetPathRoot($InstallRoot) -or $DataRoot -eq [IO.
     throw 'A filesystem root is not an acceptable destination'
 }
 if ($InstallRoot -eq $source) { throw 'InstallRoot must differ from source' }
-$payload=@('collector.ps1','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','lib\AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py')
+$payload=@('collector.ps1','control-center.ps1','ui\ControlCenter.xaml','dashboard.ps1','merge_to_sqlite.py','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','lib\AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py')
 foreach($file in $payload) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $file) -PathType Leaf)) { throw "Missing payload file: $file" }
 }
@@ -35,6 +35,7 @@ if (Test-Path -LiteralPath $InstallRoot) {
     }
 }
 $null=New-Item -ItemType Directory -Force -Path (Join-Path $InstallRoot 'lib')
+$null=New-Item -ItemType Directory -Force -Path (Join-Path $InstallRoot 'ui')
 $null=New-Item -ItemType Directory -Force -Path $DataRoot
 foreach ($file in $payload) {
     Copy-Item -LiteralPath (Join-Path $source $file) -Destination (Join-Path $InstallRoot $file) -Force
@@ -48,7 +49,7 @@ param([ValidateSet('Dashboard','Collector','Configurator','Evidence')][string]$M
 $ErrorActionPreference='Stop'
 $config=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json
 if ($Mode -eq 'Dashboard') {
-    & (Join-Path $PSScriptRoot 'dashboard.ps1') -Machine $config.machine -DataDir $config.data_root -SelfTest:$SelfTest
+    & (Join-Path $PSScriptRoot 'control-center.ps1') -Machine $config.machine -DataDir $config.data_root -ComfyLog $config.comfy_log -SelfTest:$SelfTest
 } elseif ($Mode -eq 'Configurator') {
     & (Join-Path $PSScriptRoot 'configurator.ps1') -Machine $config.machine -DataRoot $config.data_root -ComfyLog $config.comfy_log -SelfTest:$SelfTest
 } elseif ($Mode -eq 'Evidence') {
@@ -67,7 +68,7 @@ $config=[ordered]@{
 [IO.File]::WriteAllText((Join-Path $InstallRoot 'config.json'),($config|ConvertTo-Json -Depth 3),(New-Object Text.UTF8Encoding($false)))
 $manifest=[ordered]@{
     product='ComfyUI-Diagnostics'
-    version='0.8.0-LAB-CANDIDATE'
+    version='0.9.0-LAB-CANDIDATE'
     installed_utc=[DateTime]::UtcNow.ToString('o')
     install_root=$InstallRoot
     data_root=$DataRoot
@@ -79,16 +80,24 @@ if (-not $NoShortcuts) {
     $start=Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\ComfyUI Diagnostics LAB'
     $null=New-Item -ItemType Directory -Force -Path $start
     $shell=New-Object -ComObject WScript.Shell
-    foreach($entry in @(@('Dashboard','Dashboard'),@('Collector','Collector'),@('Configurator','Configurator'))) {
-        $lnk=$shell.CreateShortcut((Join-Path $start ($entry[0]+'.lnk')))
-        $lnk.TargetPath=(Join-Path $PSHOME 'powershell.exe')
-        $lnk.Arguments='-NoProfile -STA -ExecutionPolicy Bypass -File "'+(Join-Path $InstallRoot 'launch.ps1')+'" -Mode '+$entry[1]
-        $lnk.WorkingDirectory=$InstallRoot
-        $lnk.IconLocation=(Join-Path $InstallRoot 'app.ico')+',0'
-        $lnk.Save()
+    # Keep one Start Menu entry. Remove only managed legacy shortcuts from v0.8.
+    foreach($legacy in @('Dashboard.lnk','Collector.lnk','Configurator.lnk')) {
+        $path=Join-Path $start $legacy
+        if(Test-Path -LiteralPath $path -PathType Leaf){
+            $link=$shell.CreateShortcut($path)
+            if($link.Arguments.Contains((Join-Path $InstallRoot 'launch.ps1'))){
+                Remove-Item -LiteralPath $path -Force
+            }
+        }
     }
+    $lnk=$shell.CreateShortcut((Join-Path $start 'Diagnostics Monitor.lnk'))
+    $lnk.TargetPath=(Join-Path $PSHOME 'powershell.exe')
+    $lnk.Arguments='-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+(Join-Path $InstallRoot 'launch.ps1')+'" -Mode Dashboard'
+    $lnk.WorkingDirectory=$InstallRoot
+    $lnk.IconLocation=(Join-Path $InstallRoot 'app.ico')+',0'
+    $lnk.Save()
 }
 Write-Host "PASS: installed LAB program in $InstallRoot"
 Write-Host "Diagnostic data retained in $DataRoot"
-Write-Host 'Start Menu > ComfyUI Diagnostics LAB > Dashboard / Collector'
-Write-Host 'Collector runs only when explicitly launched. Do not run multiple collectors for the same machine.'
+Write-Host 'Start Menu > ComfyUI Diagnostics LAB > Diagnostics Monitor'
+Write-Host 'Single UI starts one background Collector per profile; no extra console window.'
