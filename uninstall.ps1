@@ -13,10 +13,12 @@ if ($manifest.product -ne 'ComfyUI-Diagnostics' -or $manifest.install_root -ne $
     throw 'STOP: installation manifest does not match target'
 }
 # Whitelist files installed by this project; do not remove arbitrary user files.
-foreach($f in @('collector.ps1','dashboard.ps1','merge_to_sqlite.py','launch.ps1','config.json','installation.json','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','lib\AppIcon.ps1','app.ico','evidence.ps1','configurator.ps1','analyze_evidence.py')) {
+foreach($f in @('collector.ps1','control-center.ps1','ui\ControlCenter.xaml','dashboard.ps1','merge_to_sqlite.py','launch.ps1','config.json','installation.json','lib\ComfyWs.ps1','lib\Hud.ps1','lib\Updates.ps1','lib\AppIcon.ps1','app.ico','evidence.ps1','configurator.ps1','analyze_evidence.py')) {
     $path=Join-Path $InstallRoot $f
     if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
 }
+$ui=Join-Path $InstallRoot 'ui'
+if ((Test-Path -LiteralPath $ui) -and @(Get-ChildItem -LiteralPath $ui -Force).Count -eq 0) { Remove-Item -LiteralPath $ui }
 $lib=Join-Path $InstallRoot 'lib'
 if ((Test-Path -LiteralPath $lib) -and @(Get-ChildItem -LiteralPath $lib -Force).Count -eq 0) {
     Remove-Item -LiteralPath $lib
@@ -26,7 +28,7 @@ if (@(Get-ChildItem -LiteralPath $InstallRoot -Force).Count -eq 0) {
 }
 if (-not $NoShortcuts) {
     $start=Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\ComfyUI Diagnostics LAB'
-    foreach($f in @('Dashboard.lnk','Collector.lnk','Configurator.lnk')) {
+    foreach($f in @('Diagnostics Monitor.lnk','Dashboard.lnk','Collector.lnk','Configurator.lnk')) {
         $lnk=Join-Path $start $f
         if (Test-Path -LiteralPath $lnk -PathType Leaf) {
             $shell=New-Object -ComObject WScript.Shell
