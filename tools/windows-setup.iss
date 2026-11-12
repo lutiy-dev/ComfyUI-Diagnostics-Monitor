@@ -7,8 +7,8 @@
 [Setup]
 AppId={{6E6E095C-25FA-486E-A00D-3C9A2D6AF0EA}
 AppName=ComfyUI Diagnostics Monitor
-AppVersion=0.8.0
-AppVerName=ComfyUI Diagnostics Monitor v0.8 LAB CANDIDATE
+AppVersion=0.9.0
+AppVerName=ComfyUI Diagnostics Monitor v0.9 LAB CANDIDATE
 AppPublisher=OVizLAB
 DefaultDirName={localappdata}\Programs\ComfyUI-Diagnostics
 CreateAppDir=no
@@ -17,7 +17,7 @@ DisableProgramGroupPage=yes
 Uninstallable=no
 PrivilegesRequired=lowest
 WizardStyle=modern
-OutputBaseFilename=ComfyUI-Diagnostics-Setup-v0.8-LAB
+OutputBaseFilename=ComfyUI-Diagnostics-Setup-v0.9-LAB
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64
