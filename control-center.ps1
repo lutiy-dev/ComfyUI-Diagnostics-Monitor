@@ -22,6 +22,11 @@ $xamlPath=Join-Path $PSScriptRoot 'ui\ControlCenter.xaml'
 if (-not (Test-Path -LiteralPath $xamlPath -PathType Leaf)) { throw 'STOP: missing WPF interface XAML' }
 $reader=[Xml.XmlReader]::Create($xamlPath)
 try { $window=[Windows.Markup.XamlReader]::Load($reader) } finally { $reader.Dispose() }
+$window.Title="Diagnostics Monitor | $Machine | v0.9 LAB"
+$iconPath=Join-Path $PSScriptRoot 'app.ico'
+if(Test-Path -LiteralPath $iconPath -PathType Leaf){
+ try{$window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$iconPath)}catch{}
+}
 $names=@('BrandTitle','BrandSubtitle','MachineBadge','CollectorBadge','MainTabs','MonitorTab','GenerationsTab','EvidenceTab','SettingsTab',
  'OverviewLabel','SourceStatus','GpuValue','VramValue','CpuValue','RamValue','GpuBar','VramBar','CpuBar','RamBar',
  'HistoryLabel','HistoryHint','GpuLine','VramLine','CpuLine','RamLine','AppsLabel','ComfyState','MaxState','MemoryDetail',
