@@ -58,8 +58,12 @@ if(Test-Path -LiteralPath $script:configPath -PathType Leaf){
   if([int]::TryParse([string]$prefs.comfy_port,[ref]$savedPort) -and $savedPort -ge 1 -and $savedPort -le 65535){$script:comfyPort=$savedPort}
  } catch { Write-Warning 'UI language settings invalid; using Russian' }
 }
-$ComfyUrl='http://127.0.0.1:'+$script:comfyPort
-$uri=[uri]$ComfyUrl
+if($PSBoundParameters.ContainsKey('ComfyUrl')){
+ $script:comfyPort=$uri.Port
+}else{
+ $ComfyUrl='http://127.0.0.1:'+$script:comfyPort
+ $uri=[uri]$ComfyUrl
+}
 $script:ui.ComfyPortInput.Text=[string]$script:comfyPort
 $script:strings=@{
  ru=@{
@@ -488,6 +492,7 @@ $script:ui.EvidenceStatus.Text=S 'ready'
 $script:ui.UpdatesStatus.Text=S 'updateidle'
 if($SelfTest){
  if($script:ui.MainTabs.Items.Count -ne 5 -or $script:lang -notin @('ru','en')){throw 'FAIL: WPF control center invalid tabs / settings'}
+ if($uri.Port -ne $script:comfyPort -or [string]$script:ui.ComfyPortInput.Text -ne [string]$script:comfyPort){throw 'FAIL: saved ComfyUI localhost port not loaded'}
  $window.Close()
  Write-Host 'PASS: v0.9 WPF control center loaded; 5 tabs and RU/EN settings ready'
  return
