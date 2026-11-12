@@ -208,6 +208,67 @@
      </Grid>
     </Grid>
    </TabItem>
+   <TabItem x:Name="GpuProcessesTab" Header="GPU-процессы">
+    <Grid Margin="0,18,0,0">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Grid Margin="0,0,0,12">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel>
+       <TextBlock x:Name="GpuProcessesTitle" Text="Кто использует видеопамять" FontSize="18" FontWeight="SemiBold"/>
+       <TextBlock x:Name="GpuProcessesSubtitle" Text="Windows WDDM · обновление каждые 5 сек, только при открытой вкладке" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"/>
+      </StackPanel>
+      <Button x:Name="RefreshGpuProcessesButton" Grid.Column="1" Content="Обновить" VerticalAlignment="Center"/>
+     </Grid>
+     <Border Grid.Row="1" Background="{StaticResource Card}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+      <Grid>
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock x:Name="GpuProcessesStatus" Text="Ожидание данных Windows GPU Process Memory" Foreground="#C9A869" VerticalAlignment="Center" FontSize="13"/>
+       <TextBlock x:Name="GpuProcessesUpdated" Grid.Column="1" Foreground="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"/>
+      </Grid>
+     </Border>
+     <Border Grid.Row="2" Background="{StaticResource Panel}" CornerRadius="11" Padding="12">
+      <DataGrid x:Name="GpuProcessesTable" Background="#20252B" Foreground="#E5EAF0"
+       BorderThickness="0" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+       CanUserDeleteRows="False" CanUserResizeRows="False"
+       HeadersVisibility="Column" RowHeaderWidth="0" GridLinesVisibility="Horizontal"
+       HorizontalGridLinesBrush="#333C46" VerticalGridLinesBrush="#333C46"
+       RowBackground="#222930" AlternatingRowBackground="#2A3038"
+       AlternationCount="2" ColumnHeaderHeight="38" RowHeight="33"
+       EnableRowVirtualization="True" SelectionMode="Single" HorizontalScrollBarVisibility="Auto">
+       <DataGrid.Resources>
+        <Style TargetType="{x:Type DataGridColumnHeader}">
+         <Setter Property="Background" Value="#303842"/>
+         <Setter Property="Foreground" Value="#F0F3F6"/>
+         <Setter Property="BorderBrush" Value="#46515D"/>
+         <Setter Property="BorderThickness" Value="0,0,1,1"/>
+         <Setter Property="Padding" Value="12,0,9,0"/>
+         <Setter Property="FontWeight" Value="SemiBold"/>
+         <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="GpuNameText" TargetType="{x:Type TextBlock}">
+         <Setter Property="Foreground" Value="#E5EAF0"/>
+         <Setter Property="Padding" Value="11,6,7,3"/>
+         <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style x:Key="GpuMetricText" TargetType="{x:Type TextBlock}">
+         <Setter Property="Foreground" Value="#E5EAF0"/>
+         <Setter Property="Padding" Value="8,6,10,3"/>
+         <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+       </DataGrid.Resources>
+       <DataGrid.Columns>
+        <DataGridTextColumn Header="Процесс" Binding="{Binding Name}" Width="*" MinWidth="180" ElementStyle="{StaticResource GpuNameText}"/>
+        <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="95" ElementStyle="{StaticResource GpuMetricText}"/>
+        <DataGridTextColumn Header="VRAM, МиБ" Binding="{Binding DedicatedMiB, StringFormat=F1}" Width="155" ElementStyle="{StaticResource GpuMetricText}"/>
+        <DataGridTextColumn Header="Общая, МиБ" Binding="{Binding SharedMiB, StringFormat=F1}" Width="155" ElementStyle="{StaticResource GpuMetricText}"/>
+       </DataGrid.Columns>
+      </DataGrid>
+     </Border>
+     <TextBlock x:Name="GpuProcessesDisclaimer" Grid.Row="3" TextWrapping="Wrap" FontSize="12"
+      Foreground="{StaticResource Muted}" Margin="2,12,0,0"
+      Text="WDDM: значения по процессам поступают из счётчиков Windows, не из NVIDIA-SMI. Они могут отличаться от общего VRAM и не обязательно суммируются. Нет данных ≠ 0 МиБ."/>
+    </Grid>
+   </TabItem>
    <TabItem x:Name="EvidenceTab" Header="Диагностика">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
      <StackPanel Margin="0,18,0,0">
@@ -252,6 +313,12 @@
         <TextBlock x:Name="MachineLabel" Text="Профиль компьютера" Width="215"/>
         <TextBlock x:Name="SettingsMachineValue" Text="HOME" FontWeight="SemiBold"/>
        </StackPanel>
+       <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+        <TextBlock x:Name="ComfyPortLabel" Text="Порт ComfyUI (localhost)" Width="215" VerticalAlignment="Center"/>
+        <TextBox x:Name="ComfyPortInput" Width="105" MaxLength="5" Text="8188" VerticalContentAlignment="Center" Margin="0,0,12,0"/>
+        <Button x:Name="SaveComfyPortButton" Content="Сохранить"/>
+       </StackPanel>
+       <TextBlock x:Name="ComfyPortStatus" Text="После изменения порта перезапусти монитор." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,18"/>
        <TextBlock x:Name="SettingsSafety" Text="Сбор запускается вместе с программой, данные остаются на этом компьютере. Управление GPU, драйвером и моделью отключено." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,22"/>
        <Button x:Name="CheckUpdatesButton" Content="Проверить обновления" HorizontalAlignment="Left"/>
        <TextBlock x:Name="UpdatesStatus" Text="Новые версии проверяются через официальный GitHub Release." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,10,0,0"/>

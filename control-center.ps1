@@ -13,6 +13,7 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
 . (Join-Path $PSScriptRoot 'lib\ComfyWs.ps1')
 . (Join-Path $PSScriptRoot 'lib\Updates.ps1')
+. (Join-Path $PSScriptRoot 'lib\GpuProcesses.ps1')
 $uri=[uri]$ComfyUrl
 if ($uri.Scheme -ne 'http' -or $uri.Host -notin @('127.0.0.1','localhost','::1') -or $uri.UserInfo) {
  throw 'STOP: ComfyUI must use unauthenticated localhost HTTP'
@@ -28,13 +29,14 @@ if(Test-Path -LiteralPath $iconPath -PathType Leaf){
  try{$window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$iconPath)}catch{}
 }
 $names=@('BrandTitle','BrandSubtitle','MachineBadge','CollectorBadge','MainTabs','MonitorTab','GenerationsTab','EvidenceTab','SettingsTab',
+ 'GpuProcessesTab','GpuProcessesTitle','GpuProcessesSubtitle','GpuProcessesStatus','GpuProcessesUpdated','RefreshGpuProcessesButton','GpuProcessesTable','GpuProcessesDisclaimer',
  'OverviewLabel','SourceStatus','GpuValue','VramValue','CpuValue','RamValue','GpuBar','VramBar','CpuBar','RamBar',
  'HistoryLabel','HistoryHint','GpuLine','VramLine','CpuLine','RamLine','AppsLabel','ComfyState','MaxState','MemoryDetail',
  'RecentIncidentsLabel','IncidentsList','GenerationTitle','GenerationState','GenerationTime','GenerationNode','GenerationBar','GenerationProgress',
  'GenerationNote','GenerationHistoryTitle','GenerationEvents','GenerationResultsTitle','GenerationPrivacy','OpenComfyButton',
  'EvidenceTitle','EvidenceHint','EvidenceHoursLabel','EvidenceHours','EvidenceWindows','EvidenceProcesses','EvidenceStorage',
  'EvidenceComfy','EvidenceRaw','CaptureEvidenceButton','OpenEvidenceButton','OpenLogsButton','EvidenceStatus',
- 'SettingsTitle','LanguageLabel','LanguageSelect','MachineLabel','SettingsMachineValue','SettingsSafety','CheckUpdatesButton',
+ 'SettingsTitle','LanguageLabel','LanguageSelect','MachineLabel','SettingsMachineValue','ComfyPortLabel','ComfyPortInput','SaveComfyPortButton','ComfyPortStatus','SettingsSafety','CheckUpdatesButton',
  'UpdatesStatus','FooterLeft','FooterRight')
 $script:ui=@{}
 foreach($name in $names) {
@@ -47,16 +49,29 @@ $script:ui.SettingsMachineValue.Text=$Machine
 $script:ui.FooterRight.Text="v0.9 LAB · $Machine"
 $script:configPath=Join-Path $DataDir 'ui-settings.json'
 $script:lang='ru'
+$script:comfyPort=8188
 if(Test-Path -LiteralPath $script:configPath -PathType Leaf){
  try {
   $prefs=Get-Content -LiteralPath $script:configPath -Raw -ErrorAction Stop | ConvertFrom-Json
   if($prefs.language -in @('ru','en')){$script:lang=[string]$prefs.language}
+  [int]$savedPort=0
+  if([int]::TryParse([string]$prefs.comfy_port,[ref]$savedPort) -and $savedPort -ge 1 -and $savedPort -le 65535){$script:comfyPort=$savedPort}
  } catch { Write-Warning 'UI language settings invalid; using Russian' }
 }
+if($PSBoundParameters.ContainsKey('ComfyUrl')){
+ $script:comfyPort=$uri.Port
+}else{
+ $ComfyUrl='http://127.0.0.1:'+$script:comfyPort
+ $uri=[uri]$ComfyUrl
+}
+$script:ui.ComfyPortInput.Text=[string]$script:comfyPort
 $script:strings=@{
  ru=@{
-  MonitorTab='Монитор'; GenerationsTab='Генерации'; EvidenceTab='Диагностика'; SettingsTab='Настройки'
+  MonitorTab='Монитор'; GenerationsTab='Генерации'; GpuProcessesTab='GPU-процессы'; EvidenceTab='Диагностика'; SettingsTab='Настройки'
   OverviewLabel='Обзор системы'; HistoryLabel='История ресурсов'; HistoryHint='Последние 120 записей · GPU / VRAM / CPU / RAM'
+  GpuProcessesTitle='Кто использует видеопамять';GpuProcessesSubtitle='Windows WDDM · обновление каждые 5 сек при открытой вкладке';RefreshGpuProcessesButton='Обновить';
+  GpuProcessesDisclaimer='VRAM по процессам — счётчики Windows WDDM, не NVIDIA-SMI. Сумма строк может отличаться от общего использования GPU; недоступные данные не означают ноль.';
+  gpuWait='Ожидание GPU-счётчиков Windows';gpuUnavailable='Счётчики GPU-процессов недоступны. Значения N/A, не ноль.';gpuEmpty='Нет процессов с подтверждённым использованием GPU-памяти';gpuReady='Данные WDDM · обновление';
   AppsLabel='Приложения';RecentIncidentsLabel='Последние события';GenerationTitle='Текущая генерация'
   GenerationHistoryTitle='История событий';GenerationResultsTitle='Результаты / промпты'
   GenerationPrivacy='Для защиты личных данных промпты и изображения не собираются автоматически. В v0.9 доступна нормализованная история событий.'
@@ -68,6 +83,8 @@ $script:strings=@{
   EvidenceRaw='Включить приватный RAW-лог (только с подтверждением)'
   CaptureEvidenceButton='Собрать отчёт';OpenEvidenceButton='Папка отчётов';OpenLogsButton='Папка логов'
   SettingsTitle='Настройки приложения';LanguageLabel='Язык интерфейса';MachineLabel='Профиль компьютера'
+  ComfyPortLabel='Порт ComfyUI (localhost)';SaveComfyPortButton='Сохранить';ComfyPortStatus='После изменения порта перезапусти монитор.';
+  portInvalid='Укажи порт от 1 до 65535';portSaved='Порт сохранён. Перезапусти монитор для подключения.'
   SettingsSafety='Монитор запускает один скрытый Collector. Данные остаются на компьютере. Никаких драйверов, моделей, проектов и настроек Windows он не изменяет.'
   CheckUpdatesButton='Проверить обновления'
   FooterLeft='ЛОКАЛЬНО · ДАННЫЕ НЕ ОТПРАВЛЯЮТСЯ'
@@ -77,8 +94,11 @@ $script:strings=@{
   updateidle='Проверка новых версий через GitHub Release';updateunavailable='Сведения о релизах недоступны';updatecurrent='Установлена актуальная версия'
   }
  en=@{
-  MonitorTab='Monitor';GenerationsTab='Generations';EvidenceTab='Diagnostics';SettingsTab='Settings'
+  MonitorTab='Monitor';GenerationsTab='Generations';GpuProcessesTab='GPU processes';EvidenceTab='Diagnostics';SettingsTab='Settings'
   OverviewLabel='System overview';HistoryLabel='Resource history';HistoryHint='Last 120 samples · GPU / VRAM / CPU / RAM'
+  GpuProcessesTitle='GPU memory by process';GpuProcessesSubtitle='Windows WDDM · refresh every 5s while tab is open';RefreshGpuProcessesButton='Refresh';
+  GpuProcessesDisclaimer='Per-process VRAM comes from Windows WDDM counters, not NVIDIA-SMI. Row totals need not match the GPU total. Missing data never means zero.';
+  gpuWait='Waiting for Windows GPU counters';gpuUnavailable='GPU process counters unavailable; values are N/A, not zero';gpuEmpty='No processes with confirmed GPU-memory use';gpuReady='Windows WDDM · updated';
   AppsLabel='Applications';RecentIncidentsLabel='Recent incidents';GenerationTitle='Current generation'
   GenerationHistoryTitle='Event history';GenerationResultsTitle='Results / prompts'
   GenerationPrivacy='For privacy, prompts and images are not collected automatically. v0.9 shows normalized event history.'
@@ -90,6 +110,8 @@ $script:strings=@{
   EvidenceRaw='Include private RAW log (requires confirmation)'
   CaptureEvidenceButton='Capture evidence';OpenEvidenceButton='Evidence folder';OpenLogsButton='Logs folder'
   SettingsTitle='Application settings';LanguageLabel='Interface language';MachineLabel='Computer profile'
+  ComfyPortLabel='ComfyUI port (localhost)';SaveComfyPortButton='Save';ComfyPortStatus='Restart the monitor after changing the port.';
+  portInvalid='Enter a port between 1 and 65535';portSaved='Port saved. Restart monitor to reconnect.'
   SettingsSafety='One hidden Collector is launched with the application. All data stays local. No drivers, models, projects or Windows configuration are modified.'
   CheckUpdatesButton='Check for updates'
   FooterLeft='LOCAL · NO DATA UPLOAD'
@@ -109,6 +131,9 @@ function Apply-Language {
             else{'Text'}
   $item.$property=S $key
  }
+ $script:ui.GpuProcessesTable.Columns[0].Header=if($script:lang -eq 'ru'){'Процесс'}else{'Process'}
+ $script:ui.GpuProcessesTable.Columns[2].Header=if($script:lang -eq 'ru'){'VRAM, МиБ'}else{'Dedicated, MiB'}
+ $script:ui.GpuProcessesTable.Columns[3].Header=if($script:lang -eq 'ru'){'Общая, МиБ'}else{'Shared, MiB'}
  $script:ui.LanguageSelect.SelectedIndex=if($script:lang -eq 'ru'){0}else{1}
 }
 Apply-Language
@@ -116,9 +141,23 @@ $script:ui.LanguageSelect.Add_SelectionChanged({
  $wanted=if($script:ui.LanguageSelect.SelectedIndex -eq 1){'en'}else{'ru'}
  if($wanted -eq $script:lang){return}
  $script:lang=$wanted
- $out=@{schema=1;language=$script:lang}|ConvertTo-Json -Compress
+ $out=@{schema=1;language=$script:lang;comfy_port=$script:comfyPort}|ConvertTo-Json -Compress
  [IO.File]::WriteAllText($script:configPath,$out,[Text.UTF8Encoding]::new($false))
  Apply-Language
+})
+$script:ui.SaveComfyPortButton.Add_Click({
+ [int]$selectedPort=0
+ $value=[string]$script:ui.ComfyPortInput.Text
+ if(-not [int]::TryParse($value,[ref]$selectedPort) -or $selectedPort -lt 1 -or $selectedPort -gt 65535){
+  $script:ui.ComfyPortStatus.Text=S 'portInvalid'
+  $script:ui.ComfyPortStatus.Foreground=[Windows.Media.Brushes]::Orange
+  return
+ }
+ $script:comfyPort=$selectedPort
+ $settings=@{schema=1;language=$script:lang;comfy_port=$script:comfyPort}|ConvertTo-Json -Compress
+ [IO.File]::WriteAllText($script:configPath,$settings,[Text.UTF8Encoding]::new($false))
+ $script:ui.ComfyPortStatus.Text=S 'portSaved'
+ $script:ui.ComfyPortStatus.Foreground=[Windows.Media.Brushes]::LightGreen
 })
 function To-Number($v){
  if($null -eq $v){return $null}
@@ -370,7 +409,7 @@ $script:ui.CaptureEvidenceButton.Add_Click({
  $script:ui.EvidenceStatus.Text=S 'capturing'
  $hrs=[int]$script:ui.EvidenceHours.SelectedItem.Content
  $args=@{
-  Machine=$Machine;DataRoot=$DataDir;ComfyLog=$ComfyLog;Hours=$hrs
+  Machine=$Machine;DataRoot=$DataDir;ComfyLog=$ComfyLog;ComfyUrl=$ComfyUrl;Hours=$hrs
   SkipWindows=(-not [bool]$script:ui.EvidenceWindows.IsChecked)
   SkipProcesses=(-not [bool]$script:ui.EvidenceProcesses.IsChecked)
   SkipStorage=(-not [bool]$script:ui.EvidenceStorage.IsChecked)
@@ -406,12 +445,56 @@ $script:ui.CheckUpdatesButton.Add_Click({
   if($ans -eq [Windows.MessageBoxResult]::Yes){[void][Diagnostics.Process]::Start([string]$script:updateAvailable.url)}
  }else{Start-Updates}
 })
+# Query process GPU memory only on the explicit tab; no process list saved to disk.
+$script:gpuProcessJob=$null
+$script:gpuProcessLast=[DateTime]::MinValue
+function Start-GpuProcessPoll {
+ if($null -ne $script:gpuProcessJob){return}
+ $script:gpuProcessLast=Get-Date
+ $script:ui.GpuProcessesStatus.Text=S 'gpuWait'
+ try {
+  $script:gpuProcessJob=Start-Job -ScriptBlock {
+   param($module)
+   . $module
+   Get-GpuProcessSnapshot
+  } -ArgumentList (Join-Path $PSScriptRoot 'lib\GpuProcesses.ps1') -ErrorAction Stop
+ } catch {
+  $script:ui.GpuProcessesStatus.Text=S 'gpuUnavailable'
+ }
+}
+$script:ui.RefreshGpuProcessesButton.Add_Click({Start-GpuProcessPoll})
+$script:ui.MainTabs.Add_SelectionChanged({
+ if($script:ui.MainTabs.SelectedItem -eq $script:ui.GpuProcessesTab) {Start-GpuProcessPoll}
+})
+function Refresh-GpuProcesses {
+ if($null -ne $script:gpuProcessJob -and $script:gpuProcessJob.State -in @('Completed','Failed','Stopped')){
+  $snapshot=$null
+  try { if($script:gpuProcessJob.State -eq 'Completed'){$snapshot=Receive-Job -Job $script:gpuProcessJob -ErrorAction Stop} }catch{}
+  finally {Remove-Job -Job $script:gpuProcessJob -Force -ErrorAction SilentlyContinue;$script:gpuProcessJob=$null}
+  if($null -eq $snapshot -or $snapshot.Status -ne 'OK') {
+   $script:ui.GpuProcessesStatus.Text=S 'gpuUnavailable'
+   $script:ui.GpuProcessesTable.ItemsSource=$null
+   $script:ui.GpuProcessesUpdated.Text=''
+  } else {
+   $items=@($snapshot.Processes)
+   $script:ui.GpuProcessesTable.ItemsSource=$items
+   $script:ui.GpuProcessesStatus.Text=if($items.Count -gt 0) {S 'gpuReady'} else {S 'gpuEmpty'}
+   $script:ui.GpuProcessesUpdated.Text=(Get-Date).ToString('HH:mm:ss')
+  }
+ }
+ if($script:ui.MainTabs.SelectedItem -eq $script:ui.GpuProcessesTab -and
+    $null -eq $script:gpuProcessJob -and
+    ((Get-Date)-$script:gpuProcessLast).TotalSeconds -ge 5){
+  Start-GpuProcessPoll
+ }
+}
 $script:ui.EvidenceStatus.Text=S 'ready'
 $script:ui.UpdatesStatus.Text=S 'updateidle'
 if($SelfTest){
- if($script:ui.MainTabs.Items.Count -ne 4 -or $script:lang -notin @('ru','en')){throw 'FAIL: WPF control center invalid tabs / settings'}
+ if($script:ui.MainTabs.Items.Count -ne 5 -or $script:lang -notin @('ru','en')){throw 'FAIL: WPF control center invalid tabs / settings'}
+ if($uri.Port -ne $script:comfyPort -or [string]$script:ui.ComfyPortInput.Text -ne [string]$script:comfyPort){throw 'FAIL: saved ComfyUI localhost port not loaded'}
  $window.Close()
- Write-Host 'PASS: v0.9 WPF control center loaded; 4 tabs and RU/EN settings ready'
+ Write-Host 'PASS: v0.9 WPF control center loaded; 5 tabs and RU/EN settings ready'
  return
 }
 # Single visible application instance per Windows user/profile (explicit profile namespace).
@@ -430,6 +513,7 @@ $script:timer.Interval=[TimeSpan]::FromSeconds(2)
 $script:timer.Add_Tick({
  try{
   Refresh-Telemetry
+  Refresh-GpuProcesses
   Poll-Ws
   Refresh-Generation
   if($null -ne $script:evidenceJob -and $script:evidenceJob.State -in @('Completed','Failed','Stopped')){
@@ -462,6 +546,7 @@ $window.Add_Closed({
  Close-Ws
  $script:wsMessage.Dispose()
  if($null -ne $script:updateJob){Remove-Job -Job $script:updateJob -Force -ErrorAction SilentlyContinue}
+ if($null -ne $script:gpuProcessJob){Remove-Job -Job $script:gpuProcessJob -Force -ErrorAction SilentlyContinue}
  if($null -ne $script:evidenceJob){Remove-Job -Job $script:evidenceJob -Force -ErrorAction SilentlyContinue}
  if($null -ne $script:collectorChild -and -not $script:collectorChild.HasExited){
   # Only stop the specific child launched by this window; never an external Collector.
@@ -474,7 +559,7 @@ $window.Add_Closed({
 try{
  $powershell=Join-Path $PSHOME 'powershell.exe'
  $collectorFile=Join-Path $PSScriptRoot 'collector.ps1'
- $arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$collectorFile+'" -Machine '+$Machine+' -DataDir "'+$DataDir+'"'
+ $arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$collectorFile+'" -Machine '+$Machine+' -DataDir "'+$DataDir+'" -ComfyUrl "'+$ComfyUrl+'"'
  if($ComfyLog){$arguments+=' -ComfyLog "'+$ComfyLog.Replace('"','')+'"'}
  $script:collectorChild=Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru -ErrorAction Stop
 }catch{
@@ -485,7 +570,7 @@ $script:timer.Start()
 if($RuntimeSelfTest){
  $script:runtimeSelfTestPassed=$false
  $script:runtimeTimer=New-Object Windows.Threading.DispatcherTimer
- $script:runtimeTimer.Interval=[TimeSpan]::FromSeconds(16)
+ $script:runtimeTimer.Interval=[TimeSpan]::FromSeconds(40)
  $script:runtimeTimer.Add_Tick({
   $script:runtimeTimer.Stop()
   $paths=@(Get-ChildItem -LiteralPath $DataDir -Filter ('telemetry_'+$Machine+'_*.jsonl') -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTimeUtc -Descending)
@@ -504,6 +589,10 @@ if($RuntimeSelfTest){
 [void]$window.ShowDialog()
 if($RuntimeSelfTest){
  $script:runtimeTimer.Stop()
- if(-not $script:runtimeSelfTestPassed){throw 'FAIL: unified GUI did not collect fresh CPU/RAM telemetry via hidden Collector'}
+ if(-not $script:runtimeSelfTestPassed){
+  $childState=if($null -eq $script:collectorChild){'NOT_STARTED'}elseif($script:collectorChild.HasExited){'EXITED_'+$script:collectorChild.ExitCode}else{'RUNNING'}
+  $files=@(Get-ChildItem -LiteralPath $DataDir -Filter ('telemetry_'+$Machine+'_*.jsonl') -File -ErrorAction SilentlyContinue)
+  throw ('FAIL: unified GUI did not collect fresh CPU/RAM telemetry via hidden Collector; child='+$childState+'; files='+$files.Count)
+ }
  Write-Host 'PASS: v0.9 unified WPF GUI started hidden Collector, received CPU/RAM samples and closed'
 }
