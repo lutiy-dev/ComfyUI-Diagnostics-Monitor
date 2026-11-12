@@ -28,6 +28,18 @@ function Get-DiagnosticsReleaseStatus {
             return @{status='INVALID_METADATA';message='Release link failed validation'}
         }
         $decision=Compare-DiagnosticsVersion -Current $CurrentVersion -Latest $tag
+        # A candidate is distributed via PR/CI, not via the published Release channel.
+        # A lower published version cannot prove that a local candidate is current.
+        if ($CurrentVersion -match '(?i)-LAB-CANDIDATE
+    } catch {
+        # Not distinguishable from offline, rate limit or no release without inspecting HTTP status.
+        return @{status='UNAVAILABLE';message='No verified release information (offline, no release, or API unavailable).'}
+    }
+}
+ -and $decision -eq 'UP_TO_DATE') {
+            return @{status='LAB_CANDIDATE';version=$tag;url=$link;prerelease=[bool]$release.prerelease;
+                message='Current build is a LAB candidate; GitHub Releases do not track CI artifacts'}
+        }
         return @{status=$decision; version=$tag; url=$link; prerelease=[bool]$release.prerelease}
     } catch {
         # Not distinguishable from offline, rate limit or no release without inspecting HTTP status.
