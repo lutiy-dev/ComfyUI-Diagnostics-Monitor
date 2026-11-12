@@ -35,6 +35,14 @@ jobs:
             throw 'WPF tabs missing'
           }
           Write-Host 'PASS: four-tab unified WPF initialization'
+      - name: Unified WPF runtime / hidden Collector smoke test
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          $data=Join-Path $env:RUNNER_TEMP 'UnifiedGuiSmoke'
+          .\control-center.ps1 -RuntimeSelfTest -Machine HOME -DataDir $data
+          if (-not (Test-Path -LiteralPath $data)) { throw 'Missing runtime test diagnostics' }
+          Write-Host 'PASS: one-window WPF + background Collector runtime'
       - name: Windows Forms initialization smoke test
         shell: powershell
         run: .\dashboard.ps1 -SelfTest -DataDir $env:RUNNER_TEMP
