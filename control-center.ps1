@@ -1,4 +1,4 @@
-# ComfyUI Diagnostics v0.9 LAB: single-window WPF shell, local read-only telemetry.
+﻿# ComfyUI Diagnostics v0.9 LAB: single-window WPF shell, local read-only telemetry.
 # The existing collector/evidence engines are reused without altering ComfyUI or 3ds Max.
 [CmdletBinding()]
 param(
