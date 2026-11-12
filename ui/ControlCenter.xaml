@@ -234,12 +234,33 @@
        HorizontalGridLinesBrush="#333C46" VerticalGridLinesBrush="#333C46"
        RowBackground="#222930" AlternatingRowBackground="#2A3038"
        AlternationCount="2" ColumnHeaderHeight="38" RowHeight="33"
-       EnableRowVirtualization="True" SelectionMode="Single">
+       EnableRowVirtualization="True" SelectionMode="Single" HorizontalScrollBarVisibility="Auto">
+       <DataGrid.Resources>
+        <Style TargetType="{x:Type DataGridColumnHeader}">
+         <Setter Property="Background" Value="#303842"/>
+         <Setter Property="Foreground" Value="#F0F3F6"/>
+         <Setter Property="BorderBrush" Value="#46515D"/>
+         <Setter Property="BorderThickness" Value="0,0,1,1"/>
+         <Setter Property="Padding" Value="12,0,9,0"/>
+         <Setter Property="FontWeight" Value="SemiBold"/>
+         <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="GpuNameText" TargetType="{x:Type TextBlock}">
+         <Setter Property="Foreground" Value="#E5EAF0"/>
+         <Setter Property="Padding" Value="11,6,7,3"/>
+         <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style x:Key="GpuMetricText" TargetType="{x:Type TextBlock}">
+         <Setter Property="Foreground" Value="#E5EAF0"/>
+         <Setter Property="Padding" Value="8,6,10,3"/>
+         <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+       </DataGrid.Resources>
        <DataGrid.Columns>
-        <DataGridTextColumn Header="Процесс" Binding="{Binding Name}" Width="*"/>
-        <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="90"/>
-        <DataGridTextColumn Header="VRAM, МиБ" Binding="{Binding DedicatedMiB, StringFormat=F1}" Width="140"/>
-        <DataGridTextColumn Header="Общая, МиБ" Binding="{Binding SharedMiB, StringFormat=F1}" Width="140"/>
+        <DataGridTextColumn Header="Процесс" Binding="{Binding Name}" Width="*" MinWidth="180" ElementStyle="{StaticResource GpuNameText}"/>
+        <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="95" ElementStyle="{StaticResource GpuMetricText}"/>
+        <DataGridTextColumn Header="VRAM, МиБ" Binding="{Binding DedicatedMiB, StringFormat=F1}" Width="155" ElementStyle="{StaticResource GpuMetricText}"/>
+        <DataGridTextColumn Header="Общая, МиБ" Binding="{Binding SharedMiB, StringFormat=F1}" Width="155" ElementStyle="{StaticResource GpuMetricText}"/>
        </DataGrid.Columns>
       </DataGrid>
      </Border>
@@ -292,6 +313,12 @@
         <TextBlock x:Name="MachineLabel" Text="Профиль компьютера" Width="215"/>
         <TextBlock x:Name="SettingsMachineValue" Text="HOME" FontWeight="SemiBold"/>
        </StackPanel>
+       <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+        <TextBlock x:Name="ComfyPortLabel" Text="Порт ComfyUI (localhost)" Width="215" VerticalAlignment="Center"/>
+        <TextBox x:Name="ComfyPortInput" Width="105" MaxLength="5" Text="8188" VerticalContentAlignment="Center" Margin="0,0,12,0"/>
+        <Button x:Name="SaveComfyPortButton" Content="Сохранить"/>
+       </StackPanel>
+       <TextBlock x:Name="ComfyPortStatus" Text="После изменения порта перезапусти монитор." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,18"/>
        <TextBlock x:Name="SettingsSafety" Text="Сбор запускается вместе с программой, данные остаются на этом компьютере. Управление GPU, драйвером и моделью отключено." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,22"/>
        <Button x:Name="CheckUpdatesButton" Content="Проверить обновления" HorizontalAlignment="Left"/>
        <TextBlock x:Name="UpdatesStatus" Text="Новые версии проверяются через официальный GitHub Release." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,10,0,0"/>
