@@ -69,7 +69,7 @@ $script:strings=@{
   offline='Не подключён';notrunning='Не запущен';nodata='Нет данных';collectactive='СБОР: АКТИВЕН';collectwaiting='СБОР: ОЖИДАНИЕ'
   genidle='Ожидание ComfyUI';genrunning='Генерация';genfinished='Завершено';generror='Ошибка';node='Активная нода'
   steps='Шаги';ready='Ожидание команды';capturing='Создаётся локальный отчёт…';updatefound='Доступна новая версия'
-  updateidle='Проверка новых версий через GitHub Release';updateunavailable='Сведения о релизах недоступны'
+  updateidle='Проверка новых версий через GitHub Release';updateunavailable='Сведения о релизах недоступны';updatecurrent='Установлена актуальная версия'
   }
  en=@{
   MonitorTab='Monitor';GenerationsTab='Generations';EvidenceTab='Diagnostics';SettingsTab='Settings'
@@ -91,7 +91,7 @@ $script:strings=@{
   offline='Offline';notrunning='Not running';nodata='No data';collectactive='COLLECTOR: ACTIVE';collectwaiting='COLLECTOR: WAITING'
   genidle='Waiting for ComfyUI';genrunning='Generating';genfinished='Completed';generror='Error';node='Active node'
   steps='Steps';ready='Ready';capturing='Capturing local evidence…';updatefound='Update available'
-  updateidle='Check for official GitHub releases';updateunavailable='Release information unavailable'
+  updateidle='Check for official GitHub releases';updateunavailable='Release information unavailable';updatecurrent='Current version is up to date'
  }
 }
 function S([string]$key){ return [string]$script:strings[$script:lang][$key] }
@@ -442,7 +442,7 @@ $script:timer.Add_Tick({
      $script:updateAvailable=$response
      $script:ui.UpdatesStatus.Text=(S 'updatefound')+': '+[string]$response.version
      $script:ui.CheckUpdatesButton.Content=S 'updatefound'
-    }else{$script:ui.UpdatesStatus.Text=S 'updateunavailable'}
+    }elseif($response.status -eq 'UP_TO_DATE'){$script:ui.UpdatesStatus.Text=S 'updatecurrent'}else{$script:ui.UpdatesStatus.Text=S 'updateunavailable'}
    }finally{
     Remove-Job -Job $script:updateJob -Force -ErrorAction SilentlyContinue
     $script:updateJob=$null
