@@ -14,6 +14,14 @@ try { $uri=[uri]$ComfyUrl } catch { throw 'Invalid ComfyUrl' }
 if ($uri.Scheme -ne 'http' -or $uri.Host -notin @('localhost','127.0.0.1','::1')) {
   throw 'ComfyUrl must use local HTTP'
 }
+# One collector per profile and interactive Windows session. Prevent duplicate JSONL writers.
+[bool]$script:isCollectorOwner=$false
+$script:collectorMutex=[Threading.Mutex]::new($true,('Local\ComfyUIDiagnosticsCollector_'+$Machine),[ref]$script:isCollectorOwner)
+if(-not $script:isCollectorOwner){
+    Write-Host "Collector already active for $Machine; no duplicate process started."
+    $script:collectorMutex.Dispose()
+    return
+}
 $null=New-Item -ItemType Directory -Force -Path $DataDir
 $stamp=Get-Date -Format 'yyyyMMdd'
 $telemetry=Join-Path $DataDir "telemetry_${Machine}_$stamp.jsonl"
@@ -35,9 +43,18 @@ function Append-Record([string]$path,[object]$value) {
 }
 function Read-Gpu {
   $cmd=Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
-  if (-not $cmd) { return @{status='UNAVAILABLE'} }
+  $smiPath=if($cmd){$cmd.Source}else{$null}
+  if(-not $smiPath){
+    foreach($candidate in @(
+      (Join-Path $env:WINDIR 'System32\nvidia-smi.exe'),
+      (Join-Path $env:ProgramFiles 'NVIDIA Corporation\NVSMI\nvidia-smi.exe')
+    )){
+      if(Test-Path -LiteralPath $candidate -PathType Leaf){$smiPath=$candidate;break}
+    }
+  }
+  if (-not $smiPath) { return @{status='UNAVAILABLE'} }
   try {
-    $raw=& $cmd.Source '--query-gpu=index,name,driver_version,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw' '--format=csv,noheader,nounits' 2>$null
+    $raw=& $smiPath '--query-gpu=index,name,driver_version,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw' '--format=csv,noheader,nounits' 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $raw) { throw 'SMI returned no data' }
     $gpus=@()
     foreach ($line in @($raw)) {
@@ -124,10 +141,15 @@ function Read-WindowsEvents {
 }
 Write-Host "ComfyUI Diagnostics LAB v0.3 | $Machine | local only"
 Write-Host "Data: $DataDir | Ctrl+C to stop"
-while ($true) {
-  try {
-    Append-Record $telemetry @{schema=1;machine=$Machine;source='collector';timestamp_utc=(Get-Date).ToUniversalTime().ToString('o');gpu=(Read-Gpu);ram=(Read-Ram);cpu=(Read-Cpu);max_memory=(Read-3dsMaxMemory);comfy=(Read-Comfy);comfy_log=(Read-LogSignature)}
-    Read-WindowsEvents
-  } catch { Write-Warning 'Collection cycle failed' }
-  Start-Sleep -Seconds $IntervalSeconds
+try {
+  while ($true) {
+    try {
+      Append-Record $telemetry @{schema=1;machine=$Machine;source='collector';timestamp_utc=(Get-Date).ToUniversalTime().ToString('o');gpu=(Read-Gpu);ram=(Read-Ram);cpu=(Read-Cpu);max_memory=(Read-3dsMaxMemory);comfy=(Read-Comfy);comfy_log=(Read-LogSignature)}
+      Read-WindowsEvents
+    } catch { Write-Warning 'Collection cycle failed' }
+    Start-Sleep -Seconds $IntervalSeconds
+  }
+} finally {
+  if($script:isCollectorOwner){try{$script:collectorMutex.ReleaseMutex()}catch{}}
+  $script:collectorMutex.Dispose()
 }
