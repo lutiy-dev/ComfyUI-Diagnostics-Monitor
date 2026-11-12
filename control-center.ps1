@@ -410,7 +410,7 @@ if($SelfTest){
 }
 # Single visible application instance per Windows user/profile (explicit profile namespace).
 $mutexName='Local\ComfyUIDiagnosticsControlCenter_'+$Machine
-$script:uiMutex=New-Object Threading.Mutex($false,$mutexName)
+$script:uiMutex=[Threading.Mutex]::new($false,$mutexName)
 $gotMutex=$false
 try{$gotMutex=$script:uiMutex.WaitOne(0,$false)}catch{}
 if(-not $gotMutex){
