@@ -13,7 +13,7 @@ jobs:
       - name: Parse PowerShell source
         shell: powershell
         run: |
-          foreach ($path in @('collector.ps1','dashboard.ps1','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','configurator.ps1','evidence.ps1','tests/test_live.ps1','tests/test_evidence_reliability.ps1')) {
+          foreach ($path in @('collector.ps1','control-center.ps1','dashboard.ps1','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','configurator.ps1','evidence.ps1','tests/test_live.ps1','tests/test_evidence_reliability.ps1')) {
             $tokens = $null
             $errors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
@@ -26,6 +26,23 @@ jobs:
       - name: Offline update checker unit tests
         shell: powershell
         run: .\tests\test_updates.ps1
+      - name: WPF unified UI smoke test (4 tabs / RU + EN)
+        shell: powershell
+        run: |
+          .\control-center.ps1 -SelfTest -DataDir $env:RUNNER_TEMP -Machine HOME
+          $ui=Get-Content -LiteralPath 'ui\ControlCenter.xaml' -Raw
+          if ($ui -notmatch 'MonitorTab' -or $ui -notmatch 'GenerationsTab' -or $ui -notmatch 'EvidenceTab' -or $ui -notmatch 'SettingsTab') {
+            throw 'WPF tabs missing'
+          }
+          Write-Host 'PASS: four-tab unified WPF initialization'
+      - name: Unified WPF runtime / hidden Collector smoke test
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          $data=Join-Path $env:RUNNER_TEMP 'UnifiedGuiSmoke'
+          .\control-center.ps1 -RuntimeSelfTest -Machine HOME -DataDir $data
+          if (-not (Test-Path -LiteralPath $data)) { throw 'Missing runtime test diagnostics' }
+          Write-Host 'PASS: one-window WPF + background Collector runtime'
       - name: Windows Forms initialization smoke test
         shell: powershell
         run: .\dashboard.ps1 -SelfTest -DataDir $env:RUNNER_TEMP

@@ -2,31 +2,41 @@
 
 **Windows 10/11 · NVIDIA GPU · ComfyUI / 3ds Max · Local-first diagnostics**
 
-> **v0.8.0 LAB CANDIDATE — NOT PRODUCTION.** Windows CI validates package creation, installation and automated regressions. Real GPU hardware, high-DPI layout, long-running Collector and system freeze capture require continued HOME/WORK acceptance. This utility does not diagnose hardware failures with certainty.
+> **v0.9.0 WPF LAB CANDIDATE — NOT PRODUCTION.** This is a feature-branch candidate, not a published stable release; v0.8 remains the previous public recovery baseline. Windows CI validates WPF startup, hidden Collector samples, installation and regressions; real HOME/WORK high-DPI and long-running reliability are pending. Windows CI validates package creation, installation and automated regressions. Real GPU hardware, high-DPI layout, long-running Collector and system freeze capture require continued HOME/WORK acceptance. This utility does not diagnose hardware failures with certainty.
 
 ## Dashboard preview
 
 ![Real ComfyUI Diagnostics Dashboard captured on HOME RTX 3070 Ti during an earlier LAB UI test](docs/images/dashboard-home-lab-v04.png)
 
-*Authentic HOME RTX 3070 Ti screenshot from the earlier LAB v0.4 UI (November 8, 2026). This is historical test evidence, **not** a screenshot of the current v0.8.0 interface. Current UI adds CPU/RAM/3ds Max monitoring, enhanced styling and a one-click logs folder shortcut; updated v0.8 screenshots require real host visual acceptance.*
+*Authentic HOME RTX 3070 Ti screenshot from the earlier LAB v0.4 UI (November 8, 2026). This is historical test evidence, **not** a screenshot of the current v0.8.0 interface. The new v0.9 WPF window has four modern RU/EN tabs and an automatic hidden Collector; an authentic v0.9 screenshot is still pending real HOME/WORK visual acceptance.*
 
 
 
 Read-only monitoring for creative Windows workstations: inspect GPU / VRAM, CPU / RAM, 3ds Max process memory, Windows reliability events and local ComfyUI execution, without modifying your 3D projects, AI models or drivers.
 
+## v0.9 unified desktop experience
+
+**One app, one window, one Start Menu entry.** The new WPF application contains **Монитор / Генерации / Диагностика / Настройки** (Monitor / Generations / Diagnostics / Settings). The UI is **Russian by default**, with a persistent English language switch. A per-profile hidden Collector starts with the application and prevents duplicate writers. GPU/VRAM/CPU/RAM curves, ComfyUI live node/step events, local Evidence snapshots and logs are reachable in the same window.
+
+The v0.9 installer is available from the **Windows LAB artifact on [Draft PR #20](https://github.com/lutiy-dev/ComfyUI-Diagnostics-Monitor/pull/20)**, once its exact-head CI passes. Do not confuse a CI artifact with a production release. Previous [v0.8.0 LAB](https://github.com/lutiy-dev/ComfyUI-Diagnostics-Monitor/releases/tag/v0.8.0-LAB) remains the manual rollback installer.
+
+The WPF Generations view tracks normalized ComfyUI events, not private prompt text or thumbnail galleries yet. No GPU/RAM purge or unsigned unattended update is enabled. See [v0.9 acceptance & risks](docs/RELEASE_V09_LAB.md).
+
 ## Features
 
 | Feature | Details |
 | --- | --- |
-| **Dashboard** | GPU/VRAM/CPU/RAM history, numeric legend, NVIDIA metrics, system/process memory, Collector/API/WebSocket status, normalized incident timeline |
-| **Compact HUD** | Always-on-top GPU/VRAM overlay; F9, double-click restore, drag to reposition |
-| **Configurator / Evidence** | User-triggered local JSON snapshots from Windows Events, Reliability Records, processes, storage and ComfyUI localhost API/logs |
+| **Unified WPF Monitor** | Four RU/EN tabs, 4 resource curves, ComfyUI node/step events, normalized incident timeline, one background Collector |
+| **Legacy HUD** | v0.8 HUD remains in source for compatibility; not yet integrated into v0.9 one-window UI |
+| **Diagnostics tab** | Opt-in local JSON snapshots and source selection without a second window |
 | **Open Logs Folder** | One click from Dashboard or Configurator opens `%LOCALAPPDATA%\ComfyUI-Diagnostics` |
-| **HOME / WORK** | Explicit per-machine profile; no hardcoded user directory |
+| **HOME / WORK** | Explicit per-machine profile, no hardcoded user paths or extra console windows |
 | **Updates** | Background **version check** at Dashboard startup and manual Check updates button. Installer updates are **user-confirmed**; no silent replacement of unsigned executables |
 | **Privacy** | No remote telemetry upload, prompt content, model changes, Windows TDR edits or background services |
 
 ### Download and install
+
+For the WPF candidate, obtain the exact-head v0.9 artifact from PR #20 only after Windows CI PASS. The links below to Releases remain the earlier v0.8 LAB package until v0.9 is accepted and published.
 
 Get the **unsigned LAB executable** from the [latest GitHub release](https://github.com/lutiy-dev/ComfyUI-Diagnostics-Monitor/releases) or from the exact-head [Windows CI artifact](https://github.com/lutiy-dev/ComfyUI-Diagnostics-Monitor/actions/workflows/windows-installer.yml). The build includes:
 

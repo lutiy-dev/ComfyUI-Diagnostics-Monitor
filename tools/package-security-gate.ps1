@@ -5,7 +5,7 @@ $ErrorActionPreference='Stop'
 $PackageRoot=(Resolve-Path -LiteralPath $PackageRoot).Path
 $files=@(Get-ChildItem -LiteralPath $PackageRoot -File -Recurse)
 if ($files.Count -eq 0) {throw 'FAIL: empty payload'}
-$allowed=@('.ps1','.py','.md','.bat')
+$allowed=@('.ps1','.py','.md','.bat','.xaml')
 $paths=@()
 $hashes=@()
 foreach ($f in $files) {
@@ -21,7 +21,7 @@ foreach ($f in $files) {
     $hashes+=@{path=$rel; sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 $expected=@(
- 'Install-or-Update.bat','install.ps1','uninstall.ps1','collector.ps1','dashboard.ps1','merge_to_sqlite.py',
+ 'Install-or-Update.bat','install.ps1','uninstall.ps1','collector.ps1','control-center.ps1','ui/ControlCenter.xaml','dashboard.ps1','merge_to_sqlite.py',
  'lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py',
  'docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md','docs/CPU_RAM_3DSMAX.md','docs/UI_LAYOUT_PASS.md','docs/UI_CONSISTENCY_FIX.md','docs/LEGEND_LIVE_PERCENTAGES.md'
 )
