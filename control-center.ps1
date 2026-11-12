@@ -6,7 +6,8 @@ param(
  [string]$DataDir=(Join-Path $env:LOCALAPPDATA 'ComfyUI-Diagnostics'),
  [string]$ComfyLog='',
  [string]$ComfyUrl='http://127.0.0.1:8188',
- [switch]$SelfTest
+ [switch]$SelfTest,
+ [switch]$RuntimeSelfTest
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
@@ -476,4 +477,28 @@ try{
 }
 Start-Updates
 $script:timer.Start()
+if($RuntimeSelfTest){
+ $script:runtimeSelfTestPassed=$false
+ $script:runtimeTimer=New-Object Windows.Threading.DispatcherTimer
+ $script:runtimeTimer.Interval=[TimeSpan]::FromSeconds(16)
+ $script:runtimeTimer.Add_Tick({
+  $script:runtimeTimer.Stop()
+  $paths=@(Get-ChildItem -LiteralPath $DataDir -Filter ('telemetry_'+$Machine+'_*.jsonl') -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTimeUtc -Descending)
+  if($paths.Count -gt 0){
+   $line=Get-Content -LiteralPath $paths[0].FullName -Tail 1 -ErrorAction SilentlyContinue
+   try {
+    $record=ConvertFrom-Json -InputObject $line -ErrorAction Stop
+    $seconds=([DateTime]::UtcNow-[DateTime]::Parse([string]$record.timestamp_utc).ToUniversalTime()).TotalSeconds
+    $script:runtimeSelfTestPassed=($seconds -lt 12 -and $null -ne $record.ram -and $null -ne $record.cpu)
+   }catch{}
+  }
+  $window.Close()
+ })
+ $script:runtimeTimer.Start()
+}
 [void]$window.ShowDialog()
+if($RuntimeSelfTest){
+ $script:runtimeTimer.Stop()
+ if(-not $script:runtimeSelfTestPassed){throw 'FAIL: unified GUI did not collect fresh CPU/RAM telemetry via hidden Collector'}
+ Write-Host 'PASS: v0.9 unified WPF GUI started hidden Collector, received CPU/RAM samples and closed'
+}
