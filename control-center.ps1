@@ -36,7 +36,7 @@ $names=@('BrandTitle','BrandSubtitle','MachineBadge','CollectorBadge','MainTabs'
  'GenerationNote','GenerationHistoryTitle','GenerationEvents','GenerationResultsTitle','GenerationPrivacy','OpenComfyButton',
  'EvidenceTitle','EvidenceHint','EvidenceHoursLabel','EvidenceHours','EvidenceWindows','EvidenceProcesses','EvidenceStorage',
  'EvidenceComfy','EvidenceRaw','CaptureEvidenceButton','OpenEvidenceButton','OpenLogsButton','EvidenceStatus',
- 'SettingsTitle','LanguageLabel','LanguageSelect','MachineLabel','SettingsMachineValue','SettingsSafety','CheckUpdatesButton',
+ 'SettingsTitle','LanguageLabel','LanguageSelect','MachineLabel','SettingsMachineValue','ComfyPortLabel','ComfyPortInput','SaveComfyPortButton','ComfyPortStatus','SettingsSafety','CheckUpdatesButton',
  'UpdatesStatus','FooterLeft','FooterRight')
 $script:ui=@{}
 foreach($name in $names) {
@@ -49,12 +49,18 @@ $script:ui.SettingsMachineValue.Text=$Machine
 $script:ui.FooterRight.Text="v0.9 LAB · $Machine"
 $script:configPath=Join-Path $DataDir 'ui-settings.json'
 $script:lang='ru'
+$script:comfyPort=8188
 if(Test-Path -LiteralPath $script:configPath -PathType Leaf){
  try {
   $prefs=Get-Content -LiteralPath $script:configPath -Raw -ErrorAction Stop | ConvertFrom-Json
   if($prefs.language -in @('ru','en')){$script:lang=[string]$prefs.language}
+  [int]$savedPort=0
+  if([int]::TryParse([string]$prefs.comfy_port,[ref]$savedPort) -and $savedPort -ge 1 -and $savedPort -le 65535){$script:comfyPort=$savedPort}
  } catch { Write-Warning 'UI language settings invalid; using Russian' }
 }
+$ComfyUrl='http://127.0.0.1:'+$script:comfyPort
+$uri=[uri]$ComfyUrl
+$script:ui.ComfyPortInput.Text=[string]$script:comfyPort
 $script:strings=@{
  ru=@{
   MonitorTab='Монитор'; GenerationsTab='Генерации'; GpuProcessesTab='GPU-процессы'; EvidenceTab='Диагностика'; SettingsTab='Настройки'
@@ -73,6 +79,8 @@ $script:strings=@{
   EvidenceRaw='Включить приватный RAW-лог (только с подтверждением)'
   CaptureEvidenceButton='Собрать отчёт';OpenEvidenceButton='Папка отчётов';OpenLogsButton='Папка логов'
   SettingsTitle='Настройки приложения';LanguageLabel='Язык интерфейса';MachineLabel='Профиль компьютера'
+  ComfyPortLabel='Порт ComfyUI (localhost)';SaveComfyPortButton='Сохранить';ComfyPortStatus='После изменения порта перезапусти монитор.';
+  portInvalid='Укажи порт от 1 до 65535';portSaved='Порт сохранён. Перезапусти монитор для подключения.'
   SettingsSafety='Монитор запускает один скрытый Collector. Данные остаются на компьютере. Никаких драйверов, моделей, проектов и настроек Windows он не изменяет.'
   CheckUpdatesButton='Проверить обновления'
   FooterLeft='ЛОКАЛЬНО · ДАННЫЕ НЕ ОТПРАВЛЯЮТСЯ'
@@ -98,6 +106,8 @@ $script:strings=@{
   EvidenceRaw='Include private RAW log (requires confirmation)'
   CaptureEvidenceButton='Capture evidence';OpenEvidenceButton='Evidence folder';OpenLogsButton='Logs folder'
   SettingsTitle='Application settings';LanguageLabel='Interface language';MachineLabel='Computer profile'
+  ComfyPortLabel='ComfyUI port (localhost)';SaveComfyPortButton='Save';ComfyPortStatus='Restart the monitor after changing the port.';
+  portInvalid='Enter a port between 1 and 65535';portSaved='Port saved. Restart monitor to reconnect.'
   SettingsSafety='One hidden Collector is launched with the application. All data stays local. No drivers, models, projects or Windows configuration are modified.'
   CheckUpdatesButton='Check for updates'
   FooterLeft='LOCAL · NO DATA UPLOAD'
@@ -127,9 +137,23 @@ $script:ui.LanguageSelect.Add_SelectionChanged({
  $wanted=if($script:ui.LanguageSelect.SelectedIndex -eq 1){'en'}else{'ru'}
  if($wanted -eq $script:lang){return}
  $script:lang=$wanted
- $out=@{schema=1;language=$script:lang}|ConvertTo-Json -Compress
+ $out=@{schema=1;language=$script:lang;comfy_port=$script:comfyPort}|ConvertTo-Json -Compress
  [IO.File]::WriteAllText($script:configPath,$out,[Text.UTF8Encoding]::new($false))
  Apply-Language
+})
+$script:ui.SaveComfyPortButton.Add_Click({
+ [int]$selectedPort=0
+ $value=[string]$script:ui.ComfyPortInput.Text
+ if(-not [int]::TryParse($value,[ref]$selectedPort) -or $selectedPort -lt 1 -or $selectedPort -gt 65535){
+  $script:ui.ComfyPortStatus.Text=S 'portInvalid'
+  $script:ui.ComfyPortStatus.Foreground=[Windows.Media.Brushes]::Orange
+  return
+ }
+ $script:comfyPort=$selectedPort
+ $settings=@{schema=1;language=$script:lang;comfy_port=$script:comfyPort}|ConvertTo-Json -Compress
+ [IO.File]::WriteAllText($script:configPath,$settings,[Text.UTF8Encoding]::new($false))
+ $script:ui.ComfyPortStatus.Text=S 'portSaved'
+ $script:ui.ComfyPortStatus.Foreground=[Windows.Media.Brushes]::LightGreen
 })
 function To-Number($v){
  if($null -eq $v){return $null}
@@ -381,7 +405,7 @@ $script:ui.CaptureEvidenceButton.Add_Click({
  $script:ui.EvidenceStatus.Text=S 'capturing'
  $hrs=[int]$script:ui.EvidenceHours.SelectedItem.Content
  $args=@{
-  Machine=$Machine;DataRoot=$DataDir;ComfyLog=$ComfyLog;Hours=$hrs
+  Machine=$Machine;DataRoot=$DataDir;ComfyLog=$ComfyLog;ComfyUrl=$ComfyUrl;Hours=$hrs
   SkipWindows=(-not [bool]$script:ui.EvidenceWindows.IsChecked)
   SkipProcesses=(-not [bool]$script:ui.EvidenceProcesses.IsChecked)
   SkipStorage=(-not [bool]$script:ui.EvidenceStorage.IsChecked)
@@ -530,7 +554,7 @@ $window.Add_Closed({
 try{
  $powershell=Join-Path $PSHOME 'powershell.exe'
  $collectorFile=Join-Path $PSScriptRoot 'collector.ps1'
- $arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$collectorFile+'" -Machine '+$Machine+' -DataDir "'+$DataDir+'"'
+ $arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$collectorFile+'" -Machine '+$Machine+' -DataDir "'+$DataDir+'" -ComfyUrl "'+$ComfyUrl+'"'
  if($ComfyLog){$arguments+=' -ComfyLog "'+$ComfyLog.Replace('"','')+'"'}
  $script:collectorChild=Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru -ErrorAction Stop
 }catch{
