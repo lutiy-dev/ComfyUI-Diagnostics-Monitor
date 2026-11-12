@@ -91,7 +91,7 @@ $script:strings=@{
   offline='Не подключён';notrunning='Не запущен';nodata='Нет данных';collectactive='СБОР: АКТИВЕН';collectwaiting='СБОР: ОЖИДАНИЕ'
   genidle='Ожидание ComfyUI';genrunning='Генерация';genfinished='Завершено';generror='Ошибка';node='Активная нода'
   steps='Шаги';ready='Ожидание команды';capturing='Создаётся локальный отчёт…';updatefound='Доступна новая версия'
-  updateidle='Проверка новых версий через GitHub Release';updateunavailable='Сведения о релизах недоступны';updatecurrent='Установлена актуальная версия'
+  updateidle='Проверка новых версий через GitHub Release';updateunavailable='Сведения о релизах недоступны';updatecurrent='Установлена актуальная опубликованная версия';labcandidate='LAB-сборка: обновления ищи в GitHub Actions, пока нет релиза v0.9';labopen='Открыть сборки'
   }
  en=@{
   MonitorTab='Monitor';GenerationsTab='Generations';GpuProcessesTab='GPU processes';EvidenceTab='Diagnostics';SettingsTab='Settings'
@@ -118,7 +118,7 @@ $script:strings=@{
   offline='Offline';notrunning='Not running';nodata='No data';collectactive='COLLECTOR: ACTIVE';collectwaiting='COLLECTOR: WAITING'
   genidle='Waiting for ComfyUI';genrunning='Generating';genfinished='Completed';generror='Error';node='Active node'
   steps='Steps';ready='Ready';capturing='Capturing local evidence…';updatefound='Update available'
-  updateidle='Check for official GitHub releases';updateunavailable='Release information unavailable';updatecurrent='Current version is up to date'
+  updateidle='Check for official GitHub releases';updateunavailable='Release information unavailable';updatecurrent='Latest published Release installed';labcandidate='LAB build: newer test builds are in GitHub Actions, not Releases';labopen='Open CI builds'
  }
 }
 function S([string]$key){ return [string]$script:strings[$script:lang][$key] }
@@ -424,6 +424,7 @@ $script:ui.CaptureEvidenceButton.Add_Click({
 })
 $script:updateJob=$null
 $script:updateAvailable=$null
+$script:labCandidateChannel=$false
 function Start-Updates {
  if($null -ne $script:updateJob){return}
  $v='0.9.0-LAB-CANDIDATE'
@@ -443,6 +444,12 @@ $script:ui.CheckUpdatesButton.Add_Click({
   $ans=[Windows.MessageBox]::Show('Open official GitHub release page? No automatic download or installation.',
    'ComfyUI Diagnostics','YesNo','Information')
   if($ans -eq [Windows.MessageBoxResult]::Yes){[void][Diagnostics.Process]::Start([string]$script:updateAvailable.url)}
+ }elseif($script:labCandidateChannel){
+  $ans=[Windows.MessageBox]::Show('Open the official GitHub Actions workflow? Artifacts are unsigned LAB candidates and must be installed manually.',
+   'ComfyUI Diagnostics','YesNo','Warning')
+  if($ans -eq [Windows.MessageBoxResult]::Yes){
+   [void][Diagnostics.Process]::Start('https://github.com/lutiy-dev/ComfyUI-Diagnostics-Monitor/actions/workflows/windows-installer.yml')
+  }
  }else{Start-Updates}
 })
 # Query process GPU memory only on the explicit tab; no process list saved to disk.
@@ -531,6 +538,10 @@ $script:timer.Add_Tick({
      $script:updateAvailable=$response
      $script:ui.UpdatesStatus.Text=(S 'updatefound')+': '+[string]$response.version
      $script:ui.CheckUpdatesButton.Content=S 'updatefound'
+    }elseif($response.status -eq 'LAB_CANDIDATE'){
+      $script:labCandidateChannel=$true
+      $script:ui.UpdatesStatus.Text=S 'labcandidate'
+      $script:ui.CheckUpdatesButton.Content=S 'labopen'
     }elseif($response.status -eq 'UP_TO_DATE'){$script:ui.UpdatesStatus.Text=S 'updatecurrent'}else{$script:ui.UpdatesStatus.Text=S 'updateunavailable'}
    }finally{
     Remove-Job -Job $script:updateJob -Force -ErrorAction SilentlyContinue
