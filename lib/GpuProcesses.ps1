@@ -7,17 +7,17 @@ function Convert-GpuProcessMemoryRows {
  foreach($r in @($Rows)){
   $name=[string]$r.Name
   if($name -notmatch '(?i)(?:^|_)pid_(\d+)(?:_|$)'){continue}
-  $pid=[int]$Matches[1]
+  $processId=[int]$Matches[1]
   # Windows GPU perf counters can have multiple LUID/phys instances per process.
   # Values are counter allocations and may not sum to nvidia-smi device used VRAM.
   $d=0.0;$shared=0.0
   try{$d=[math]::Max(0,[double]$r.DedicatedUsage)}catch{}
   try{$shared=[math]::Max(0,[double]$r.SharedUsage)}catch{}
-  if(-not $totals.ContainsKey($pid)){
-   $totals[$pid]=[pscustomobject]@{Pid=$pid;DedicatedBytes=0.0;SharedBytes=0.0}
+  if(-not $totals.ContainsKey($processId)){
+   $totals[$processId]=[pscustomobject]@{Pid=$processId;DedicatedBytes=0.0;SharedBytes=0.0}
   }
-  $totals[$pid].DedicatedBytes+=$d
-  $totals[$pid].SharedBytes+=$shared
+  $totals[$processId].DedicatedBytes+=$d
+  $totals[$processId].SharedBytes+=$shared
  }
  return @($totals.Values | Sort-Object DedicatedBytes -Descending)
 }
