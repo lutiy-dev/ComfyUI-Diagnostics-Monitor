@@ -61,7 +61,7 @@ begin
   Args := '-NoProfile -STA -ExecutionPolicy Bypass -File "' +
     ExpandConstant('{tmp}\ComfyUI-Diagnostics-LAB\install.ps1') +
     '" -Machine ' + MachineName + ' -Upgrade';
-  if not Exec(Executable, Args, '', SW_SHOW, ewWaitUntilTerminated, ExitCode) then
+  if not Exec(Executable, Args, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
     RaiseException('Installer could not launch PowerShell.');
   if ExitCode <> 0 then
     RaiseException('Installation failed (exit code ' + IntToStr(ExitCode) + '). Diagnostic data were not removed.');
