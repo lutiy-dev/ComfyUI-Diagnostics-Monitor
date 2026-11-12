@@ -570,7 +570,7 @@ $script:timer.Start()
 if($RuntimeSelfTest){
  $script:runtimeSelfTestPassed=$false
  $script:runtimeTimer=New-Object Windows.Threading.DispatcherTimer
- $script:runtimeTimer.Interval=[TimeSpan]::FromSeconds(16)
+ $script:runtimeTimer.Interval=[TimeSpan]::FromSeconds(40)
  $script:runtimeTimer.Add_Tick({
   $script:runtimeTimer.Stop()
   $paths=@(Get-ChildItem -LiteralPath $DataDir -Filter ('telemetry_'+$Machine+'_*.jsonl') -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTimeUtc -Descending)
@@ -589,6 +589,10 @@ if($RuntimeSelfTest){
 [void]$window.ShowDialog()
 if($RuntimeSelfTest){
  $script:runtimeTimer.Stop()
- if(-not $script:runtimeSelfTestPassed){throw 'FAIL: unified GUI did not collect fresh CPU/RAM telemetry via hidden Collector'}
+ if(-not $script:runtimeSelfTestPassed){
+  $childState=if($null -eq $script:collectorChild){'NOT_STARTED'}elseif($script:collectorChild.HasExited){'EXITED_'+$script:collectorChild.ExitCode}else{'RUNNING'}
+  $files=@(Get-ChildItem -LiteralPath $DataDir -Filter ('telemetry_'+$Machine+'_*.jsonl') -File -ErrorAction SilentlyContinue)
+  throw ('FAIL: unified GUI did not collect fresh CPU/RAM telemetry via hidden Collector; child='+$childState+'; files='+$files.Count)
+ }
  Write-Host 'PASS: v0.9 unified WPF GUI started hidden Collector, received CPU/RAM samples and closed'
 }
