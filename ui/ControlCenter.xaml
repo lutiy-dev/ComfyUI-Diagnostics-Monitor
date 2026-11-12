@@ -236,10 +236,10 @@
        AlternationCount="2" ColumnHeaderHeight="38" RowHeight="33"
        EnableRowVirtualization="True" SelectionMode="Single">
        <DataGrid.Columns>
-        <DataGridTextColumn x:Name="GpuProcessNameColumn" Header="Процесс" Binding="{Binding Name}" Width="*"/>
-        <DataGridTextColumn x:Name="GpuProcessIdColumn" Header="PID" Binding="{Binding Pid}" Width="90"/>
-        <DataGridTextColumn x:Name="GpuProcessDedicatedColumn" Header="VRAM, МиБ" Binding="{Binding DedicatedMiB, StringFormat=F1}" Width="140"/>
-        <DataGridTextColumn x:Name="GpuProcessSharedColumn" Header="Общая, МиБ" Binding="{Binding SharedMiB, StringFormat=F1}" Width="140"/>
+        <DataGridTextColumn Header="Процесс" Binding="{Binding Name}" Width="*"/>
+        <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="90"/>
+        <DataGridTextColumn Header="VRAM, МиБ" Binding="{Binding DedicatedMiB, StringFormat=F1}" Width="140"/>
+        <DataGridTextColumn Header="Общая, МиБ" Binding="{Binding SharedMiB, StringFormat=F1}" Width="140"/>
        </DataGrid.Columns>
       </DataGrid>
      </Border>
