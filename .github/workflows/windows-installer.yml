@@ -14,7 +14,7 @@ jobs:
       - name: PowerShell syntax validation
         shell: powershell
         run: |
-          foreach ($path in @('install.ps1','uninstall.ps1','control-center.ps1','dashboard.ps1','collector.ps1','evidence.ps1','configurator.ps1','lib/Hud.ps1','lib/ComfyWs.ps1','lib/Updates.ps1','lib/AppIcon.ps1')) {
+          foreach ($path in @('install.ps1','uninstall.ps1','control-center.ps1','dashboard.ps1','collector.ps1','evidence.ps1','configurator.ps1','lib/Hud.ps1','lib/ComfyWs.ps1','lib/GpuProcesses.ps1','lib/Updates.ps1','lib/AppIcon.ps1')) {
             $tokens=$null; $errors=$null
             $null=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
             if ($errors.Count -ne 0) { $errors | Format-List | Out-String | Write-Error; exit 1 }
@@ -65,7 +65,7 @@ jobs:
       - name: Build ZIP package
         shell: powershell
         run: |
-          $files=@('Install-or-Update.bat','install.ps1','uninstall.ps1','collector.ps1','control-center.ps1','ui/ControlCenter.xaml','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/CPU_RAM_3DSMAX.md','docs/UI_LAYOUT_PASS.md','docs/UI_CONSISTENCY_FIX.md','docs/LEGEND_LIVE_PERCENTAGES.md')
+          $files=@('Install-or-Update.bat','install.ps1','uninstall.ps1','collector.ps1','control-center.ps1','ui/ControlCenter.xaml','dashboard.ps1','merge_to_sqlite.py','lib/ComfyWs.ps1','lib/GpuProcesses.ps1','lib/Hud.ps1','lib/Updates.ps1','lib/AppIcon.ps1','evidence.ps1','configurator.ps1','analyze_evidence.py','docs/DIAGNOSTICS_V06.md','docs/DIAGNOSTICS_V07.md','docs/WINDOWS_INSTALL.md','docs/HUD_MODE.md','docs/CHATGPT_DIAGNOSTICS_ACCESS.md','docs/CPU_RAM_3DSMAX.md','docs/UI_LAYOUT_PASS.md','docs/UI_CONSISTENCY_FIX.md','docs/LEGEND_LIVE_PERCENTAGES.md')
           $stage=Join-Path $env:RUNNER_TEMP 'ComfyUI-Diagnostics-LAB'
           New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib'),(Join-Path $stage 'docs'),(Join-Path $stage 'ui') | Out-Null
           foreach($f in $files) {
@@ -77,7 +77,7 @@ jobs:
           (Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.9.zip' -Algorithm SHA256).Hash | Out-File -Encoding ascii 'ComfyUI-Diagnostics-LAB-v0.9.sha256'
           $check=Join-Path $env:RUNNER_TEMP 'VerifyPackagePayload'
           Expand-Archive -LiteralPath 'ComfyUI-Diagnostics-LAB-v0.9.zip' -DestinationPath $check -ErrorAction Stop
-          foreach ($required in @('ComfyUI-Diagnostics-LAB/install.ps1','ComfyUI-Diagnostics-LAB/dashboard.ps1','ComfyUI-Diagnostics-LAB/configurator.ps1','ComfyUI-Diagnostics-LAB/lib/AppIcon.ps1','ComfyUI-Diagnostics-LAB/Install-or-Update.bat','ComfyUI-Diagnostics-LAB/control-center.ps1','ComfyUI-Diagnostics-LAB/ui/ControlCenter.xaml')) {
+          foreach ($required in @('ComfyUI-Diagnostics-LAB/install.ps1','ComfyUI-Diagnostics-LAB/dashboard.ps1','ComfyUI-Diagnostics-LAB/configurator.ps1','ComfyUI-Diagnostics-LAB/lib/AppIcon.ps1','ComfyUI-Diagnostics-LAB/Install-or-Update.bat','ComfyUI-Diagnostics-LAB/control-center.ps1','ComfyUI-Diagnostics-LAB/ui/ControlCenter.xaml','ComfyUI-Diagnostics-LAB/lib/GpuProcesses.ps1')) {
             if (-not (Test-Path -LiteralPath (Join-Path $check $required) -PathType Leaf)) { throw "STOP: packaged ZIP missing $required" }
           }
           if (-not ((Get-FileHash 'ComfyUI-Diagnostics-LAB-v0.9.zip' -Algorithm SHA256).Hash -eq (Get-Content 'ComfyUI-Diagnostics-LAB-v0.9.sha256' -Raw).Trim())) { throw 'STOP: packaged ZIP checksum mismatch' }
