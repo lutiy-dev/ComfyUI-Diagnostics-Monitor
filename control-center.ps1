@@ -117,6 +117,9 @@ function Apply-Language {
             else{'Text'}
   $item.$property=S $key
  }
+ $script:ui.GpuProcessesTable.Columns[0].Header=if($script:lang -eq 'ru'){'Процесс'}else{'Process'}
+ $script:ui.GpuProcessesTable.Columns[2].Header=if($script:lang -eq 'ru'){'VRAM, МиБ'}else{'Dedicated, MiB'}
+ $script:ui.GpuProcessesTable.Columns[3].Header=if($script:lang -eq 'ru'){'Общая, МиБ'}else{'Shared, MiB'}
  $script:ui.LanguageSelect.SelectedIndex=if($script:lang -eq 'ru'){0}else{1}
 }
 Apply-Language
@@ -127,9 +130,6 @@ $script:ui.LanguageSelect.Add_SelectionChanged({
  $out=@{schema=1;language=$script:lang}|ConvertTo-Json -Compress
  [IO.File]::WriteAllText($script:configPath,$out,[Text.UTF8Encoding]::new($false))
  Apply-Language
- $script:ui.GpuProcessesTable.Columns[0].Header=if($script:lang -eq 'ru'){'Процесс'}else{'Process'}
- $script:ui.GpuProcessesTable.Columns[2].Header=if($script:lang -eq 'ru'){'VRAM, МиБ'}else{'Dedicated, MiB'}
- $script:ui.GpuProcessesTable.Columns[3].Header=if($script:lang -eq 'ru'){'Общая, МиБ'}else{'Shared, MiB'}
 })
 function To-Number($v){
  if($null -eq $v){return $null}
