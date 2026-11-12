@@ -20,6 +20,13 @@
 - Missing/unavailable counters or insufficient permissions show **UNAVAILABLE / N/A**, never a fabricated 0 MiB. Only executable short names are displayed; no paths, command lines or client content.
 - Read-only tests cover PID grouping and neutral fallback; actual WDDM measurements on HOME/WORK require manual comparison to Windows Task Manager before claiming production correctness.
 
+## HOME screenshot review (2026-11-12)
+Real HOME RTX 3070 Ti user screenshots demonstrate five WPF tabs, an active Collector, GPU/VRAM/CPU/RAM curves and live WDDM processes. They also exposed two regressions:
+
+- **Readability:** the WPF DataGrid used a light default Windows column-header theme and squeezed numeric columns. Dark headers, contrasting labels, fixed minimum numeric widths, right-aligned values and horizontal scrolling were added. This is CI-validated, but the revised Windows layout at HOME DPI is NOT YET TESTED.
+- **ComfyUI port mismatch:** HOME ComfyUI runs at `http://127.0.0.1:8190` in the supplied screenshot; Diagnostics used default `8188`. Settings now has a validated **ComfyUI localhost port** field (1–65535), saved in the existing local UI preferences. The default remains `8188`. User action for HOME: set `8190`, click Save, restart Diagnostics. The selected port is shared by UI WebSocket, Collector queue polling, Open ComfyUI, and on-demand Evidence. No ComfyUI port or server setting is modified.
+- The screenshot alone does not validate the exact WDDM per-process allocated/shared bytes versus NVIDIA VRAM totals. The user is encouraged to compare dedicated and shared counters to Task Manager (Details tab, choose GPU memory columns).
+
 ## Not yet supported
 - Prompt/result gallery and detailed workflow configuration from ComfyUI are **not yet implemented**; the Generations pane explicitly states that normalized event data are all that is displayed.
 - Free VRAM/RAM cache action is **not implemented**: no tested safe semantics for active generations and existing HOME GPU TDR incidents.
